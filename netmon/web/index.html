@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <title>netmon</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <header>
+    <h1>netmon</h1>
+    <div class="filters">
+      <label>Aralık:
+        <select id="range">
+          <option value="3600">Son saat</option>
+          <option value="86400" selected>Son 24 saat</option>
+          <option value="604800">Son 7 gün</option>
+          <option value="2592000">Son 30 gün</option>
+        </select>
+      </label>
+      <label>Ağ:
+        <select id="ssid"><option value="">Tümü</option></select>
+      </label>
+      <button id="refresh">Yenile</button>
+    </div>
+  </header>
+
+  <section class="card current">
+    <h2>Şu an</h2>
+    <div id="current-body">Yükleniyor…</div>
+  </section>
+
+  <section class="card full">
+    <h2>Zaman Serisi</h2>
+    <canvas id="chart-timeseries" height="80"></canvas>
+  </section>
+
+  <div class="row">
+    <section class="card half">
+      <h2>Ağa göre</h2>
+      <canvas id="chart-network"></canvas>
+      <table id="table-network"></table>
+    </section>
+    <section class="card half">
+      <h2>Uygulamaya göre</h2>
+      <canvas id="chart-process"></canvas>
+    </section>
+  </div>
+
+  <section class="card full">
+    <h2>Domain'lere göre <small>(~ yaklaşık)</small></h2>
+    <canvas id="chart-domain" height="80"></canvas>
+  </section>
+</body>
+</html>

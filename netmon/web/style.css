@@ -1,0 +1,63 @@
+:root {
+  --bg: #f5f5f7;
+  --card: #ffffff;
+  --text: #1d1d1f;
+  --muted: #6e6e73;
+  --accent: #0071e3;
+  --border: #d2d2d7;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1d1d1f;
+    --card: #2c2c2e;
+    --text: #f5f5f7;
+    --muted: #98989d;
+    --accent: #0a84ff;
+    --border: #3a3a3c;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+header {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+header h1 { margin: 0; font-size: 20px; font-weight: 600; }
+.filters { display: flex; gap: 12px; align-items: center; }
+.filters select, .filters button {
+  font: inherit;
+  padding: 6px 10px;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.filters button { cursor: pointer; }
+
+.card {
+  margin: 16px 24px;
+  padding: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.card h2 { margin: 0 0 12px; font-size: 14px; font-weight: 600; color: var(--muted); }
+.card h2 small { font-weight: 400; font-size: 12px; }
+.row { display: flex; gap: 0; }
+.row .half { flex: 1; }
+.row .half:first-child { margin-right: 8px; }
+.row .half:last-child  { margin-left: 8px; }
+.current #current-body { font-size: 16px; }
+table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+td, th { padding: 4px 6px; border-bottom: 1px solid var(--border); text-align: left; }
+td.num, th.num { text-align: right; }
