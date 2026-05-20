@@ -50,12 +50,37 @@ def parse_ifconfig(text: str) -> dict:
     return result
 
 
-def classify_link_type(interface: str, ssid: str | None, media: str | None) -> str:
-    """Map (interface, ssid, media) -> link_type tag."""
-    if ssid:
-        for pat in _HOTSPOT_PATTERNS:
-            if pat.search(ssid):
-                return "iphone-hotspot"
+def parse_ipconfig_summary(text: str) -> dict:
+    """Extract SSID + InterfaceType from `ipconfig getsummary <iface>` output.
+
+    macOS Sonoma+ exposes the real SSID here. `networksetup -getairportnetwork`
+    is unreliable on modern macOS (returns "not associated" even when up).
+    """
+    result = {"ssid": None, "interface_type": None}
+    for line in text.splitlines():
+        s = line.strip()
+        if s.startswith("SSID : "):
+            value = s[len("SSID : "):].strip()
+            if value and value.lower() != "<redacted>":
+                result["ssid"] = value
+        elif s.startswith("InterfaceType : "):
+            result["interface_type"] = s[len("InterfaceType : "):].strip()
+    return result
+
+
+def classify_link_type(
+    interface: str,
+    ssid: str | None,
+    media: str | None,
+    interface_type: str | None = None,
+) -> str:
+    """Map (interface, ssid, media, interface_type) -> link_type tag."""
+    is_wifi = bool(interface_type and "wifi" in interface_type.lower())
+    if is_wifi or ssid:
+        if ssid:
+            for pat in _HOTSPOT_PATTERNS:
+                if pat.search(ssid):
+                    return "iphone-hotspot"
         return "wifi"
     if media and "USB" in media:
         return "usb-tether"

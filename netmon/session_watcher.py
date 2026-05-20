@@ -8,9 +8,9 @@ from dataclasses import dataclass
 from netmon.db import close_session, get_active_session, open_session
 from netmon.parsers.network_info import (
     classify_link_type,
-    parse_airport_ssid,
     parse_default_interface,
     parse_ifconfig,
+    parse_ipconfig_summary,
 )
 
 log = logging.getLogger("netmon.session")
@@ -44,13 +44,18 @@ def collect_snapshot() -> NetworkSnapshot | None:
     iface = parse_default_interface(_run(["/sbin/route", "-n", "get", "default"]))
     if not iface:
         return None
-    ssid = parse_airport_ssid(_run(["/usr/sbin/networksetup", "-getairportnetwork", iface]))
+    summary = parse_ipconfig_summary(_run(["/usr/sbin/ipconfig", "getsummary", iface]))
     ifc = parse_ifconfig(_run(["/sbin/ifconfig", iface]))
-    link_type = classify_link_type(interface=iface, ssid=ssid, media=ifc.get("media") or "")
+    link_type = classify_link_type(
+        interface=iface,
+        ssid=summary["ssid"],
+        media=ifc.get("media") or "",
+        interface_type=summary["interface_type"],
+    )
     return NetworkSnapshot(
         interface=iface,
         link_type=link_type,
-        ssid=ssid,
+        ssid=summary["ssid"],
         bssid=None,  # BSSID requires system_profiler; skipped for v1
         ip_address=ifc.get("ip_address"),
     )

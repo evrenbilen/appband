@@ -4,6 +4,7 @@ from netmon.parsers.network_info import (
     parse_default_interface,
     parse_airport_ssid,
     parse_ifconfig,
+    parse_ipconfig_summary,
     classify_link_type,
 )
 
@@ -58,6 +59,35 @@ class ParseIfconfigTest(unittest.TestCase):
         self.assertEqual(result["status"], "active")
 
 
+class ParseIpconfigSummaryTest(unittest.TestCase):
+    def test_extracts_ssid_and_interface_type(self):
+        text = (
+            "  Network Service : Wi-Fi\n"
+            "  BSSID : aa:bb:cc:dd:ee:ff\n"
+            "  InterfaceType : WiFi\n"
+            "  SSID : sylwen 5GHZ\n"
+            "  Security : WPA2 Personal\n"
+        )
+        r = parse_ipconfig_summary(text)
+        self.assertEqual(r["ssid"], "sylwen 5GHZ")
+        self.assertEqual(r["interface_type"], "WiFi")
+
+    def test_redacted_ssid_treated_as_none(self):
+        text = "  InterfaceType : WiFi\n  SSID : <redacted>\n"
+        r = parse_ipconfig_summary(text)
+        self.assertIsNone(r["ssid"])
+        self.assertEqual(r["interface_type"], "WiFi")
+
+    def test_ethernet_interface(self):
+        text = "  InterfaceType : Ethernet\n"
+        r = parse_ipconfig_summary(text)
+        self.assertIsNone(r["ssid"])
+        self.assertEqual(r["interface_type"], "Ethernet")
+
+    def test_empty_input(self):
+        self.assertEqual(parse_ipconfig_summary(""), {"ssid": None, "interface_type": None})
+
+
 class ClassifyLinkTypeTest(unittest.TestCase):
     def test_wifi_when_ssid_present(self):
         self.assertEqual(
@@ -82,6 +112,19 @@ class ClassifyLinkTypeTest(unittest.TestCase):
         self.assertEqual(
             classify_link_type(interface="en0", ssid=None, media="autoselect (1000baseT <full-duplex>)"),
             "ethernet",
+        )
+
+    def test_wifi_when_interface_type_says_wifi_without_ssid(self):
+        # SSID redacted but InterfaceType says WiFi -> still wifi
+        self.assertEqual(
+            classify_link_type(interface="en0", ssid=None, media="", interface_type="WiFi"),
+            "wifi",
+        )
+
+    def test_iphone_hotspot_via_interface_type_plus_ssid(self):
+        self.assertEqual(
+            classify_link_type(interface="en0", ssid="iPhone", media="", interface_type="WiFi"),
+            "iphone-hotspot",
         )
 
 
