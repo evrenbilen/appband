@@ -1,10 +1,13 @@
 import json
+import os
 import sqlite3
+import tempfile
 import threading
 import unittest
 import urllib.request
 import urllib.error
 from contextlib import closing
+from pathlib import Path
 
 from netmon.db import init_schema, open_session, insert_interface_sample
 from netmon.server import build_handler, NetmonServer
@@ -12,13 +15,25 @@ from netmon.server import build_handler, NetmonServer
 
 class ServerTest(unittest.TestCase):
     def setUp(self):
-        self.conn = sqlite3.connect(":memory:", check_same_thread=False)
-        init_schema(self.conn)
-        sid = open_session(self.conn, 1000, "en0", "wifi", "Office", None, "192.168.1.42")
-        for ts in range(1000, 1060):
-            insert_interface_sample(self.conn, ts=ts, session_id=sid, bytes_in=100, bytes_out=20)
+        # Use an on-disk temp DB so the per-request connections opened by the
+        # server can access the same data (`:memory:` is not sharable across
+        # connections).
+        fd, db_file = tempfile.mkstemp(suffix=".db")
+        os.close(fd)
+        self.db_file = db_file
+        self.db_path = Path(db_file)
 
-        handler = build_handler(self.conn)
+        # Seed the DB via a setup connection, then close it before the server
+        # starts so WAL mode doesn't conflict.
+        setup_conn = sqlite3.connect(db_file)
+        init_schema(setup_conn)
+        sid = open_session(setup_conn, 1000, "en0", "wifi", "Office", None, "192.168.1.42")
+        for ts in range(1000, 1060):
+            insert_interface_sample(setup_conn, ts=ts, session_id=sid, bytes_in=100, bytes_out=20)
+        setup_conn.commit()
+        setup_conn.close()
+
+        handler = build_handler(self.db_path)
         self.server = NetmonServer(("127.0.0.1", 0), handler)
         self.port = self.server.server_address[1]
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -27,7 +42,12 @@ class ServerTest(unittest.TestCase):
     def tearDown(self):
         self.server.shutdown()
         self.thread.join(timeout=2)
-        self.conn.close()
+        # Remove temp DB and any WAL/SHM sidecar files.
+        for suffix in ("", "-wal", "-shm"):
+            try:
+                os.unlink(self.db_file + suffix)
+            except FileNotFoundError:
+                pass
 
     def _get(self, path: str) -> tuple[int, dict]:
         with closing(urllib.request.urlopen(f"http://127.0.0.1:{self.port}{path}", timeout=2)) as resp:

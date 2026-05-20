@@ -10,7 +10,6 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from netmon.config import load_config
-from netmon.db import connect
 
 log = logging.getLogger("netmon.server")
 WEB_ROOT = Path(__file__).parent / "web"
@@ -30,8 +29,8 @@ class NetmonServer(ThreadingHTTPServer):
     daemon_threads = True
 
 
-def build_handler(conn: sqlite3.Connection) -> type:
-    """Return a handler class bound to the given DB connection."""
+def build_handler(db_path: Path) -> type:
+    """Return a handler class that opens a fresh DB connection per request."""
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -82,30 +81,34 @@ def build_handler(conn: sqlite3.Connection) -> type:
             from_ts = _qint(qs, "from", now - 86400)
             to_ts = _qint(qs, "to", now)
 
+            conn = sqlite3.connect(str(db_path), timeout=10.0, check_same_thread=False)
             try:
+                conn.execute("PRAGMA journal_mode=WAL")
                 if path == "/api/current":
-                    self._json(self._current(now))
+                    self._json(self._current(conn, now))
                 elif path == "/api/sessions":
-                    self._json({"sessions": self._sessions(from_ts, to_ts)})
+                    self._json({"sessions": self._sessions(conn, from_ts, to_ts)})
                 elif path == "/api/timeseries":
                     from netmon.db import query_timeseries
                     gran = qs.get("granularity", ["hour"])[0]
                     self._json({"timeseries": query_timeseries(conn, from_ts, to_ts, gran)})
                 elif path == "/api/by-network":
-                    self._json({"rows": self._by_network(from_ts, to_ts)})
+                    self._json({"rows": self._by_network(conn, from_ts, to_ts)})
                 elif path == "/api/by-process":
                     limit = _qint(qs, "limit", 20)
-                    self._json({"rows": self._by_process(from_ts, to_ts, limit)})
+                    self._json({"rows": self._by_process(conn, from_ts, to_ts, limit)})
                 elif path == "/api/by-domain":
                     limit = _qint(qs, "limit", 50)
-                    self._json({"rows": self._by_domain(from_ts, to_ts, limit)})
+                    self._json({"rows": self._by_domain(conn, from_ts, to_ts, limit)})
                 else:
                     self._error(404, "not found")
             except Exception as e:  # noqa: BLE001
                 log.exception("handler error")
                 self._error(500, str(e))
+            finally:
+                conn.close()
 
-        def _current(self, now: int) -> dict:
+        def _current(self, conn: sqlite3.Connection, now: int) -> dict:
             cur = conn.execute(
                 "SELECT id, started_at, interface, link_type, ssid, ip_address "
                 "FROM sessions WHERE ended_at IS NULL ORDER BY started_at DESC LIMIT 1"
@@ -125,7 +128,7 @@ def build_handler(conn: sqlite3.Connection) -> type:
             bi, bo = cur.fetchone()
             return {"session": session, "bytes_in_60s": bi, "bytes_out_60s": bo}
 
-        def _sessions(self, from_ts: int, to_ts: int) -> list[dict]:
+        def _sessions(self, conn: sqlite3.Connection, from_ts: int, to_ts: int) -> list[dict]:
             cur = conn.execute(
                 "SELECT id, started_at, ended_at, interface, link_type, ssid, ip_address "
                 "FROM sessions WHERE started_at < ? AND (ended_at IS NULL OR ended_at >= ?) "
@@ -135,7 +138,7 @@ def build_handler(conn: sqlite3.Connection) -> type:
             keys = ["id", "started_at", "ended_at", "interface", "link_type", "ssid", "ip_address"]
             return [dict(zip(keys, r)) for r in cur.fetchall()]
 
-        def _by_network(self, from_ts: int, to_ts: int) -> list[dict]:
+        def _by_network(self, conn: sqlite3.Connection, from_ts: int, to_ts: int) -> list[dict]:
             cur = conn.execute(
                 """
                 SELECT s.link_type, COALESCE(s.ssid, ''),
@@ -153,7 +156,7 @@ def build_handler(conn: sqlite3.Connection) -> type:
                 for r in cur.fetchall()
             ]
 
-        def _by_process(self, from_ts: int, to_ts: int, limit: int) -> list[dict]:
+        def _by_process(self, conn: sqlite3.Connection, from_ts: int, to_ts: int, limit: int) -> list[dict]:
             cur = conn.execute(
                 """
                 SELECT process_name, SUM(bytes_in), SUM(bytes_out)
@@ -170,7 +173,7 @@ def build_handler(conn: sqlite3.Connection) -> type:
                 for r in cur.fetchall()
             ]
 
-        def _by_domain(self, from_ts: int, to_ts: int, limit: int) -> list[dict]:
+        def _by_domain(self, conn: sqlite3.Connection, from_ts: int, to_ts: int, limit: int) -> list[dict]:
             # Distribute each (process, time-bucket) process_samples bytes
             # equally across the distinct remote hostnames the process touched
             # in that bucket. Buckets are 5-minute windows.
@@ -230,17 +233,13 @@ def main(config_path: Path | None = None) -> int:
     root.setLevel(cfg.log_level)
     log.info("netmon server starting on %s:%d", cfg.bind_host, cfg.port)
 
-    conn = connect(cfg.db_path)
-    conn.execute("PRAGMA journal_mode=WAL")
-
-    server = NetmonServer((cfg.bind_host, cfg.port), build_handler(conn))
+    server = NetmonServer((cfg.bind_host, cfg.port), build_handler(cfg.db_path))
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         log.info("interrupt")
     finally:
         server.server_close()
-        conn.close()
     return 0
 
 
