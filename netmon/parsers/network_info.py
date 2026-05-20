@@ -11,7 +11,6 @@ _HOTSPOT_PATTERNS = (
     re.compile(r"\bandroid\b", re.IGNORECASE),
     re.compile(r"\bsamsung\b", re.IGNORECASE),
     re.compile(r"\bgalaxy\b", re.IGNORECASE),
-    re.compile(r"^[^:]+'s\s+iPhone", re.IGNORECASE),  # "Evren's iPhone"
 )
 
 
@@ -51,7 +50,7 @@ def parse_ifconfig(text: str) -> dict:
     return result
 
 
-def classify_link_type(interface: str, ssid: str | None, media: str) -> str:
+def classify_link_type(interface: str, ssid: str | None, media: str | None) -> str:
     """Map (interface, ssid, media) -> link_type tag."""
     if ssid:
         for pat in _HOTSPOT_PATTERNS:
