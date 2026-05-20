@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS connections (
   process_name  TEXT NOT NULL,
   remote_ip     TEXT NOT NULL,
   remote_port   INTEGER,
-  protocol      TEXT NOT NULL
+  protocol      TEXT NOT NULL,
+  scope         TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_conn_ts ON connections(ts);
 CREATE INDEX IF NOT EXISTS idx_conn_ip ON connections(remote_ip);
@@ -59,11 +60,18 @@ CREATE TABLE IF NOT EXISTS dns_cache (
 """
 
 
+def _ensure_column(conn: sqlite3.Connection, table: str, column: str, decl: str) -> None:
+    cur = conn.execute(f"PRAGMA table_info({table})")
+    if column not in {r[1] for r in cur.fetchall()}:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+
+
 def init_schema(conn: sqlite3.Connection) -> None:
     """Create tables, indexes, and enable WAL on a fresh or existing DB."""
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA foreign_keys=ON;")
     conn.executescript(SCHEMA)
+    _ensure_column(conn, "connections", "scope", "TEXT")
     conn.commit()
 
 
@@ -147,11 +155,12 @@ def insert_connection(
     remote_ip: str,
     remote_port: int | None,
     protocol: str,
+    scope: str | None = None,
 ) -> None:
     conn.execute(
-        "INSERT INTO connections (ts, session_id, process_name, remote_ip, remote_port, protocol) "
-        "VALUES (?, ?, ?, ?, ?, ?)",
-        (ts, session_id, process_name, remote_ip, remote_port, protocol),
+        "INSERT INTO connections (ts, session_id, process_name, remote_ip, remote_port, protocol, scope) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (ts, session_id, process_name, remote_ip, remote_port, protocol, scope),
     )
 
 

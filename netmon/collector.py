@@ -117,6 +117,7 @@ def run_connection_tick(state: CollectorState, now: int) -> None:
             remote_ip=r["remote_ip"],
             remote_port=r["remote_port"],
             protocol=r["protocol"],
+            scope=r["scope"],
         )
         state.dns_enqueue(r["remote_ip"])
 

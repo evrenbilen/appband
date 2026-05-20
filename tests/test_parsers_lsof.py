@@ -39,6 +39,16 @@ class ParseLsofTest(unittest.TestCase):
         for r in rows:
             self.assertNotEqual(r["process_name"], "Local")
 
+    def test_classifies_scope_internet(self):
+        rows = parse_lsof_connections(SAMPLE)
+        google = next(r for r in rows if r["process_name"] == "Google")
+        self.assertEqual(google["scope"], "internet")
+
+    def test_classifies_scope_lan(self):
+        rows = parse_lsof_connections(SAMPLE)
+        local2 = next(r for r in rows if r["process_name"] == "Local2")
+        self.assertEqual(local2["scope"], "lan")
+
 
 if __name__ == "__main__":
     unittest.main()

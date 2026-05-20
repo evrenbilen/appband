@@ -9,7 +9,7 @@ import urllib.error
 from contextlib import closing
 from pathlib import Path
 
-from netmon.db import init_schema, open_session, insert_interface_sample
+from netmon.db import init_schema, open_session, insert_interface_sample, insert_process_sample, insert_connection
 from netmon.server import build_handler, NetmonServer
 
 
@@ -91,6 +91,61 @@ class ServerTest(unittest.TestCase):
         status, body = self._get("/api/by-domain?from=0&to=10000")
         self.assertEqual(status, 200)
         self.assertEqual(body["rows"], [])
+
+    def test_by_process_scope_internet_excludes_lan_only(self):
+        # Add process samples and connections with mixed scopes via a second setup connection.
+        # Use ts=500 so it falls in range from=0&to=10000.
+        setup_conn = sqlite3.connect(self.db_file)
+        init_schema(setup_conn)
+        # Re-fetch the session id (created in setUp)
+        row = setup_conn.execute("SELECT id FROM sessions WHERE ended_at IS NULL LIMIT 1").fetchone()
+        sid = row[0]
+        # ProcA: internet traffic
+        insert_process_sample(setup_conn, ts=500, session_id=sid, process_name="ProcA", pid=100, bytes_in=1000, bytes_out=200)
+        insert_connection(setup_conn, ts=500, session_id=sid, process_name="ProcA", remote_ip="8.8.8.8", remote_port=443, protocol="tcp", scope="internet")
+        # ProcB: LAN-only traffic
+        insert_process_sample(setup_conn, ts=500, session_id=sid, process_name="ProcB", pid=200, bytes_in=500, bytes_out=100)
+        insert_connection(setup_conn, ts=500, session_id=sid, process_name="ProcB", remote_ip="192.168.1.1", remote_port=80, protocol="tcp", scope="lan")
+        setup_conn.commit()
+        setup_conn.close()
+
+        status, body = self._get("/api/by-process?scope=internet&from=0&to=10000")
+        self.assertEqual(status, 200)
+        names = {r["process_name"] for r in body["rows"]}
+        self.assertIn("ProcA", names)
+        self.assertNotIn("ProcB", names)
+
+    def test_by_process_scope_lan_excludes_internet_only(self):
+        setup_conn = sqlite3.connect(self.db_file)
+        init_schema(setup_conn)
+        row = setup_conn.execute("SELECT id FROM sessions WHERE ended_at IS NULL LIMIT 1").fetchone()
+        sid = row[0]
+        insert_process_sample(setup_conn, ts=600, session_id=sid, process_name="ProcC", pid=300, bytes_in=2000, bytes_out=400)
+        insert_connection(setup_conn, ts=600, session_id=sid, process_name="ProcC", remote_ip="1.2.3.4", remote_port=443, protocol="tcp", scope="internet")
+        insert_process_sample(setup_conn, ts=600, session_id=sid, process_name="ProcD", pid=400, bytes_in=800, bytes_out=150)
+        insert_connection(setup_conn, ts=600, session_id=sid, process_name="ProcD", remote_ip="10.0.0.1", remote_port=22, protocol="tcp", scope="lan")
+        setup_conn.commit()
+        setup_conn.close()
+
+        status, body = self._get("/api/by-process?scope=lan&from=0&to=10000")
+        self.assertEqual(status, 200)
+        names = {r["process_name"] for r in body["rows"]}
+        self.assertIn("ProcD", names)
+        self.assertNotIn("ProcC", names)
+
+    def test_by_process_scope_all_returns_all(self):
+        setup_conn = sqlite3.connect(self.db_file)
+        init_schema(setup_conn)
+        row = setup_conn.execute("SELECT id FROM sessions WHERE ended_at IS NULL LIMIT 1").fetchone()
+        sid = row[0]
+        insert_process_sample(setup_conn, ts=700, session_id=sid, process_name="ProcE", pid=500, bytes_in=3000, bytes_out=600)
+        setup_conn.commit()
+        setup_conn.close()
+
+        status, body = self._get("/api/by-process?scope=all&from=0&to=10000")
+        self.assertEqual(status, 200)
+        names = {r["process_name"] for r in body["rows"]}
+        self.assertIn("ProcE", names)
 
 
 if __name__ == "__main__":

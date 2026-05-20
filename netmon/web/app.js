@@ -14,6 +14,7 @@ const fmtTime = (ts) => new Date(ts * 1000).toLocaleString();
 const state = {
   range: 86400,
   ssid: "",
+  scope: "internet",
   charts: {},
 };
 
@@ -113,7 +114,7 @@ async function loadByNetwork() {
 
 async function loadByProcess() {
   const { from, to } = rangeBounds();
-  const data = await fetchJson(`/api/by-process?from=${from}&to=${to}&limit=15`);
+  const data = await fetchJson(`/api/by-process?from=${from}&to=${to}&limit=15&scope=${state.scope}`);
   makeOrUpdateChart("chart-process", {
     type: "bar",
     data: {
@@ -133,7 +134,7 @@ async function loadByProcess() {
 
 async function loadByDomain() {
   const { from, to } = rangeBounds();
-  const data = await fetchJson(`/api/by-domain?from=${from}&to=${to}&limit=30`);
+  const data = await fetchJson(`/api/by-domain?from=${from}&to=${to}&limit=30&scope=${state.scope}`);
   makeOrUpdateChart("chart-domain", {
     type: "bar",
     data: {
@@ -162,6 +163,7 @@ async function loadByDomain() {
 function bind() {
   $("range").addEventListener("change", (e) => { state.range = parseInt(e.target.value, 10); refreshAll(); });
   $("ssid").addEventListener("change", (e) => { state.ssid = e.target.value; refreshAll(); });
+  $("scope").addEventListener("change", (e) => { state.scope = e.target.value; refreshAll(); });
   $("refresh").addEventListener("click", () => refreshAll());
 }
 

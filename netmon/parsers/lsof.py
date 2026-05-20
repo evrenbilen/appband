@@ -14,6 +14,27 @@ simple split() reliably yields NAME at index 8 onward.
 from __future__ import annotations
 
 
+def _classify_scope(ip: str) -> str:
+    """Return 'internet' or 'lan' for a non-loopback/non-linklocal IP."""
+    # IPv4 RFC1918
+    if ip.startswith("10."):
+        return "lan"
+    if ip.startswith("192.168."):
+        return "lan"
+    if ip.startswith("172."):
+        # 172.16.0.0/12 -> 172.16.x.x through 172.31.x.x
+        try:
+            second = int(ip.split(".")[1])
+        except (ValueError, IndexError):
+            return "internet"
+        if 16 <= second <= 31:
+            return "lan"
+    # IPv6 unique-local fc00::/7
+    if ip.lower().startswith("fc") or ip.lower().startswith("fd"):
+        return "lan"
+    return "internet"
+
+
 def _is_excluded(ip: str) -> bool:
     if ip.startswith("127.") or ip == "::1":
         return True
@@ -79,6 +100,7 @@ def parse_lsof_connections(text: str) -> list[dict]:
                 "remote_ip": remote_ip,
                 "remote_port": remote_port,
                 "protocol": proto,
+                "scope": _classify_scope(remote_ip),
             }
         )
     return rows

@@ -70,8 +70,8 @@ class CollectorTickTest(unittest.TestCase):
         enqueued = []
         self.state.dns_enqueue = enqueued.append
         rows = [
-            {"process_name": "Chrome", "pid": 42, "remote_ip": "1.2.3.4", "remote_port": 443, "protocol": "tcp"},
-            {"process_name": "zoom.us", "pid": 88, "remote_ip": "5.6.7.8", "remote_port": 8801, "protocol": "udp"},
+            {"process_name": "Chrome", "pid": 42, "remote_ip": "1.2.3.4", "remote_port": 443, "protocol": "tcp", "scope": "internet"},
+            {"process_name": "zoom.us", "pid": 88, "remote_ip": "5.6.7.8", "remote_port": 8801, "protocol": "udp", "scope": "internet"},
         ]
         with patch("netmon.collector.parse_lsof_connections", return_value=rows), \
              patch("netmon.collector._run", return_value=""):

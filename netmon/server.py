@@ -96,10 +96,12 @@ def build_handler(db_path: Path) -> type:
                     self._json({"rows": self._by_network(conn, from_ts, to_ts)})
                 elif path == "/api/by-process":
                     limit = _qint(qs, "limit", 20)
-                    self._json({"rows": self._by_process(conn, from_ts, to_ts, limit)})
+                    scope = qs.get("scope", ["internet"])[0]
+                    self._json({"rows": self._by_process(conn, from_ts, to_ts, limit, scope)})
                 elif path == "/api/by-domain":
                     limit = _qint(qs, "limit", 50)
-                    self._json({"rows": self._by_domain(conn, from_ts, to_ts, limit)})
+                    scope = qs.get("scope", ["internet"])[0]
+                    self._json({"rows": self._by_domain(conn, from_ts, to_ts, limit, scope)})
                 else:
                     self._error(404, "not found")
             except Exception as e:  # noqa: BLE001
@@ -156,28 +158,69 @@ def build_handler(db_path: Path) -> type:
                 for r in cur.fetchall()
             ]
 
-        def _by_process(self, conn: sqlite3.Connection, from_ts: int, to_ts: int, limit: int) -> list[dict]:
+        def _by_process(self, conn: sqlite3.Connection, from_ts: int, to_ts: int, limit: int, scope: str = "internet") -> list[dict]:
+            if scope == "all":
+                cur = conn.execute(
+                    """
+                    SELECT process_name, SUM(bytes_in), SUM(bytes_out)
+                      FROM process_samples
+                     WHERE ts >= ? AND ts < ?
+                     GROUP BY process_name
+                     ORDER BY SUM(bytes_in) + SUM(bytes_out) DESC
+                     LIMIT ?
+                    """,
+                    (from_ts, to_ts, limit),
+                )
+                return [{"process_name": r[0], "bytes_in": r[1] or 0, "bytes_out": r[2] or 0, "approximate": False} for r in cur.fetchall()]
+
+            BUCKET = 300
             cur = conn.execute(
-                """
-                SELECT process_name, SUM(bytes_in), SUM(bytes_out)
-                  FROM process_samples
-                 WHERE ts >= ? AND ts < ?
-                 GROUP BY process_name
-                 ORDER BY SUM(bytes_in) + SUM(bytes_out) DESC
+                f"""
+                WITH proc_buckets AS (
+                  SELECT process_name, (ts / {BUCKET}) * {BUCKET} AS bucket,
+                         SUM(bytes_in) AS bin, SUM(bytes_out) AS bout
+                    FROM process_samples
+                   WHERE ts >= ? AND ts < ?
+                   GROUP BY process_name, bucket
+                ),
+                conn_buckets AS (
+                  SELECT process_name, (ts / {BUCKET}) * {BUCKET} AS bucket,
+                         SUM(CASE WHEN scope = ? THEN 1 ELSE 0 END) AS matching,
+                         SUM(CASE WHEN scope IS NOT NULL THEN 1 ELSE 0 END) AS total
+                    FROM connections
+                   WHERE ts >= ? AND ts < ?
+                   GROUP BY process_name, bucket
+                ),
+                shares AS (
+                  SELECT process_name, bucket,
+                         CASE WHEN total > 0 THEN (matching * 1.0 / total) ELSE 0 END AS share
+                    FROM conn_buckets
+                )
+                SELECT pb.process_name,
+                       CAST(SUM(pb.bin  * COALESCE(s.share, 0)) AS INTEGER) AS bytes_in,
+                       CAST(SUM(pb.bout * COALESCE(s.share, 0)) AS INTEGER) AS bytes_out
+                  FROM proc_buckets pb
+             LEFT JOIN shares s USING (process_name, bucket)
+                 GROUP BY pb.process_name
+                HAVING SUM(pb.bin * COALESCE(s.share, 0)) + SUM(pb.bout * COALESCE(s.share, 0)) > 0
+                 ORDER BY bytes_in + bytes_out DESC
                  LIMIT ?
                 """,
-                (from_ts, to_ts, limit),
+                (from_ts, to_ts, scope, from_ts, to_ts, limit),
             )
-            return [
-                {"process_name": r[0], "bytes_in": r[1] or 0, "bytes_out": r[2] or 0}
-                for r in cur.fetchall()
-            ]
+            return [{"process_name": r[0], "bytes_in": r[1] or 0, "bytes_out": r[2] or 0, "approximate": True} for r in cur.fetchall()]
 
-        def _by_domain(self, conn: sqlite3.Connection, from_ts: int, to_ts: int, limit: int) -> list[dict]:
+        def _by_domain(self, conn: sqlite3.Connection, from_ts: int, to_ts: int, limit: int, scope: str = "internet") -> list[dict]:
             # Distribute each (process, time-bucket) process_samples bytes
             # equally across the distinct remote hostnames the process touched
             # in that bucket. Buckets are 5-minute windows.
             BUCKET = 300
+            if scope == "all":
+                scope_clause = ""
+                scope_params: tuple = ()
+            else:
+                scope_clause = " AND c.scope = ?"
+                scope_params = (scope,)
             cur = conn.execute(
                 f"""
                 WITH proc_buckets AS (
@@ -195,7 +238,7 @@ def build_handler(db_path: Path) -> type:
                          COALESCE(d.hostname, c.remote_ip) AS host
                     FROM connections c
                LEFT JOIN dns_cache d ON d.ip = c.remote_ip
-                   WHERE c.ts >= ? AND c.ts < ?
+                   WHERE c.ts >= ? AND c.ts < ?{scope_clause}
                    GROUP BY c.process_name, bucket, host
                 ),
                 counts AS (
@@ -213,7 +256,7 @@ def build_handler(db_path: Path) -> type:
                  ORDER BY bytes_in + bytes_out DESC
                  LIMIT ?
                 """,
-                (from_ts, to_ts, from_ts, to_ts, limit),
+                (from_ts, to_ts, from_ts, to_ts, *scope_params, limit),
             )
             return [
                 {"host": r[0], "bytes_in": int(r[1] or 0), "bytes_out": int(r[2] or 0), "approximate": True}
