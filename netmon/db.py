@@ -70,7 +70,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
 def connect(db_path: Path) -> sqlite3.Connection:
     """Open a connection to the netmon DB and ensure schema exists."""
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path), isolation_level=None, timeout=10.0)
+    conn = sqlite3.connect(str(db_path), isolation_level=None, timeout=10.0, check_same_thread=False)
     init_schema(conn)
     return conn
 
