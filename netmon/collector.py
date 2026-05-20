@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import signal
+import sqlite3
 import subprocess
 import threading
 import time
@@ -28,16 +29,34 @@ from netmon.session_watcher import SessionWatcher, collect_snapshot
 
 log = logging.getLogger("netmon.collector")
 
+# Thread-local storage — each writer thread gets its own sqlite3.Connection.
+_thread_local = threading.local()
+
 
 @dataclass
 class CollectorState:
-    conn: object
+    db_path: Path                        # replaces conn; threads open their own connections
     iface_tracker: DeltaTracker
     proc_in_tracker: DeltaTracker
     proc_out_tracker: DeltaTracker
     active_interface: str | None
     active_session_id: int | None
     dns_enqueue: Callable[[str], None]
+
+
+def _conn(state: CollectorState) -> sqlite3.Connection:
+    """Return this thread's SQLite connection, opening it lazily on first use."""
+    if not hasattr(_thread_local, "conn"):
+        c = sqlite3.connect(
+            str(state.db_path),
+            isolation_level=None,
+            timeout=10.0,
+            check_same_thread=False,
+        )
+        c.execute("PRAGMA journal_mode=WAL")
+        c.execute("PRAGMA foreign_keys=ON")
+        _thread_local.conn = c
+    return _thread_local.conn
 
 
 def _run(cmd: list[str]) -> str:
@@ -65,7 +84,7 @@ def run_interface_tick(state: CollectorState, now: int) -> None:
     if state.active_session_id is None:
         return
     insert_interface_sample(
-        state.conn,
+        _conn(state),
         ts=now,
         session_id=state.active_session_id,
         bytes_in=delta_in,
@@ -90,7 +109,7 @@ def run_process_tick(state: CollectorState, now: int) -> None:
         if delta_in == 0 and delta_out == 0:
             continue
         insert_process_sample(
-            state.conn,
+            _conn(state),
             ts=now,
             session_id=state.active_session_id,
             process_name=r["process_name"],
@@ -110,7 +129,7 @@ def run_connection_tick(state: CollectorState, now: int) -> None:
             state.dns_enqueue(r["remote_ip"])
             continue
         insert_connection(
-            state.conn,
+            _conn(state),
             ts=now,
             session_id=state.active_session_id,
             process_name=r["process_name"],
@@ -138,10 +157,13 @@ def main(config_path: Path | None = None) -> int:
     _setup_logging(cfg)
     log.info("netmon collector starting")
 
-    conn = connect(cfg.db_path)
-    watcher = SessionWatcher(conn)
+    # Run schema migration once at startup with a short-lived connection.
+    # Each worker thread will open its own connection lazily via _conn().
+    bootstrap = connect(cfg.db_path)
+    bootstrap.close()
+
     state = CollectorState(
-        conn=conn,
+        db_path=cfg.db_path,
         iface_tracker=DeltaTracker(max_delta_per_sec=cfg.discontinuity_threshold_bps),
         proc_in_tracker=DeltaTracker(max_delta_per_sec=cfg.discontinuity_threshold_bps),
         proc_out_tracker=DeltaTracker(max_delta_per_sec=cfg.discontinuity_threshold_bps),
@@ -160,23 +182,41 @@ def main(config_path: Path | None = None) -> int:
     signal.signal(signal.SIGINT, _stop)
 
     loop = asyncio.new_event_loop()
-    resolver = DnsResolver(
-        conn=conn,
-        timeout=cfg.dns_lookup_timeout_sec,
-        concurrency=cfg.dns_concurrency,
-    )
 
-    def _enqueue(ip: str) -> None:
-        loop.call_soon_threadsafe(resolver.queue.put_nowait, ip)
-
-    state.dns_enqueue = _enqueue
+    # The DNS resolver lives entirely in the asyncio thread; it opens its own
+    # connection there so it never competes with the writer threads.
+    _resolver_ready = threading.Event()
+    _resolver_ref: list[DnsResolver] = []
 
     def _loop_runner():
         asyncio.set_event_loop(loop)
+        dns_conn = sqlite3.connect(
+            str(cfg.db_path),
+            isolation_level=None,
+            timeout=10.0,
+            check_same_thread=False,
+        )
+        dns_conn.execute("PRAGMA journal_mode=WAL")
+        dns_conn.execute("PRAGMA foreign_keys=ON")
+        resolver = DnsResolver(
+            conn=dns_conn,
+            timeout=cfg.dns_lookup_timeout_sec,
+            concurrency=cfg.dns_concurrency,
+        )
+        _resolver_ref.append(resolver)
+        _resolver_ready.set()
         loop.create_task(resolver.run_forever())
         loop.run_forever()
+        dns_conn.close()
 
     threading.Thread(target=_loop_runner, name="dns", daemon=True).start()
+    _resolver_ready.wait(timeout=5.0)
+
+    def _enqueue(ip: str) -> None:
+        if _resolver_ref:
+            loop.call_soon_threadsafe(_resolver_ref[0].queue.put_nowait, ip)
+
+    state.dns_enqueue = _enqueue
 
     def _loop(interval: int, fn, name: str):
         last_run = 0
@@ -191,6 +231,8 @@ def main(config_path: Path | None = None) -> int:
             stop.wait(0.5)
 
     def _session_loop():
+        # SessionWatcher uses this thread's own connection (opened lazily by _conn).
+        watcher = SessionWatcher(_conn(state))
         last_run = 0
         while not stop.is_set():
             now = int(time.time())
@@ -212,12 +254,12 @@ def main(config_path: Path | None = None) -> int:
             if now - last_run >= 86400:
                 try:
                     purge_old(
-                        conn,
+                        _conn(state),
                         now=now,
                         sample_retention_sec=cfg.retention_days * 86400,
                         dns_retention_sec=cfg.dns_cache_retention_days * 86400,
                     )
-                    vacuum(conn)
+                    vacuum(_conn(state))
                 except Exception:  # noqa: BLE001
                     log.exception("retention tick failed")
                 last_run = now
@@ -238,18 +280,21 @@ def main(config_path: Path | None = None) -> int:
     for t in threads:
         t.join(timeout=5)
 
+    # Close the active session using a fresh short-lived connection.
     if state.active_session_id is not None:
         from netmon.db import close_session
-        close_session(conn, state.active_session_id, ended_at=int(time.time()))
+        shutdown_conn = sqlite3.connect(str(cfg.db_path), isolation_level=None, timeout=10.0)
+        shutdown_conn.execute("PRAGMA journal_mode=WAL")
+        close_session(shutdown_conn, state.active_session_id, ended_at=int(time.time()))
+        shutdown_conn.close()
 
-    # Cancel all pending tasks in the DNS loop before stopping it
+    # Cancel all pending tasks in the DNS loop before stopping it.
     def _cancel_and_stop():
         for task in asyncio.all_tasks(loop):
             task.cancel()
         loop.stop()
 
     loop.call_soon_threadsafe(_cancel_and_stop)
-    conn.close()
     log.info("netmon collector exited cleanly")
     return 0
 
