@@ -93,7 +93,7 @@ def run_interface_tick(state: CollectorState, now: int) -> None:
 
 
 def run_process_tick(state: CollectorState, now: int) -> None:
-    text = _run(["/usr/bin/nettop", "-P", "-x", "-L", "1", "-J", "bytes_in,bytes_out"])
+    text = _run(["/usr/bin/nettop", "-P", "-x", "-L", "1", "-t", "external", "-J", "bytes_in,bytes_out"])
     rows = parse_nettop(text)
     present_keys: set[str] = set()
     for r in rows:
