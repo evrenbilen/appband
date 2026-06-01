@@ -522,7 +522,7 @@ async function loadByDomain() {
   const containerId = "domain-body";
   try {
     const { from, to } = rangeBounds();
-    const data = await fetchJson(`/api/by-domain?from=${from}&to=${to}&limit=30&scope=${state.scope}`);
+    const data = await fetchJson(`/api/by-domain?from=${from}&to=${to}&limit=15&scope=${state.scope}`);
 
     if (!data.rows || data.rows.length === 0) {
       showEmpty(containerId);
