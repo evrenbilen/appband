@@ -4,6 +4,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import logging
+import logging.handlers
 import sqlite3
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -374,7 +375,9 @@ def build_handler(db_path: Path) -> type:
 def main(config_path: Path | None = None) -> int:
     cfg = load_config(config_path)
     cfg.log_dir.mkdir(parents=True, exist_ok=True)
-    handler = logging.FileHandler(cfg.log_dir / "server.log")
+    handler = logging.handlers.RotatingFileHandler(
+        cfg.log_dir / "server.log", maxBytes=5_000_000, backupCount=3
+    )
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
     root = logging.getLogger("appband")
     root.addHandler(handler)

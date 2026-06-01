@@ -109,5 +109,29 @@ class CollectorTickTest(unittest.TestCase):
         self.assertEqual(set(enqueued), {"1.2.3.4", "5.6.7.8"})
 
 
+class SetupLoggingTest(unittest.TestCase):
+    def test_uses_rotating_file_handler(self):
+        # Long-lived LaunchAgents must not grow their log file unbounded.
+        import logging
+        from logging.handlers import RotatingFileHandler
+
+        from appband.collector import _setup_logging
+        from appband.config import Config
+
+        root = logging.getLogger("appband")
+        saved = root.handlers[:]
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                _setup_logging(Config(log_dir=Path(tmp)))
+                self.assertTrue(
+                    any(isinstance(h, RotatingFileHandler) for h in root.handlers)
+                )
+        finally:
+            for h in root.handlers[:]:
+                if h not in saved:
+                    h.close()
+                    root.removeHandler(h)
+
+
 if __name__ == "__main__":
     unittest.main()

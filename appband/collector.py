@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import logging.handlers
 import signal
 import sqlite3
 import subprocess
@@ -153,7 +154,9 @@ def run_connection_tick(state: CollectorState, now: int) -> None:
 
 def _setup_logging(cfg: Config) -> None:
     cfg.log_dir.mkdir(parents=True, exist_ok=True)
-    handler = logging.FileHandler(cfg.log_dir / "collector.log")
+    handler = logging.handlers.RotatingFileHandler(
+        cfg.log_dir / "collector.log", maxBytes=5_000_000, backupCount=3
+    )
     handler.setFormatter(
         logging.Formatter("%(asctime)s %(levelname)s %(name)s %(threadName)s %(message)s")
     )
