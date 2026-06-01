@@ -67,9 +67,9 @@ Veri zaten tam (`scope=all` → `approximate:false`); backend sadece canlı/ince
 - [x] Uygulama-içi Uninstall akışı (NSAlert + suppression-checkbox → `uninstall.sh --purge`) (M, med) — `3c47cd1`
 - [x] 1Hz başlık timer'ı → Combine sink (`$menuBarTitle`) (S, low — idle güç) — `3c47cd1`
 
-### [ ] EPIC P1-C: Dashboard doğruluğu + dürüstlüğü
-- [ ] Ölü SSID filtresini bağla (`state.ssid` hiçbir fetch'e eklenmiyor) **+ `process_samples`/`connections` için `session_id` index'i** (M, high) (`appband/web/app.js`, `appband/server.py`, `appband/db.py`, `tests/test_server.py`)
-- [ ] Yaklaşıklık rozetini görünür yap + "Nasıl okunur?" FAQ popover'ı (CSS/i18n zaten var, kullanılmıyor) (S, high) (`appband/web/index.html`, `app.js`, `style.css`)
+### [~] EPIC P1-C: Dashboard doğruluğu + dürüstlüğü  ·  **çekirdek yapıldı** (118 test + 7 e2e geçiyor)
+- [x] Ölü SSID filtresini bağla + `session_id` index'leri (backend `5601749`, frontend `48c39e4`) — `ssid`/`link_type` param, JOIN sessions, e2e doğruladı (M, high)
+- [x] Yaklaşıklık rozetini görünür yap + "Nasıl okunur?" tooltip (By Domain hep, By App scope≠all) — `9679029` (S, high)
 - [ ] Bilgi-mimarisi: tam yüzeyleri (toplam, uygulama, ağ) öne çıkar; tek yaklaşık panel olan by-domain'i ikincil + etiketli yap (M, high) (`appband/web/index.html`, `app.js`)
 - [ ] Kullanılmayan `/api/sessions`'tan "Ziyaret edilen ağlar" görünümü (M, med) (`appband/web/index.html`, `app.js`, `locales/*.json`)
 - [ ] By App / By Domain listelerine client-side arama + "tümünü göster" (15'lik tavan) (M, med) (`appband/web/app.js`, `index.html`, `style.css`)
