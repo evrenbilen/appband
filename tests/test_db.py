@@ -1,7 +1,10 @@
+import os
 import sqlite3
+import tempfile
 import unittest
+from pathlib import Path
 
-from appband.db import init_schema
+from appband.db import connect, init_schema
 
 
 class InitSchemaTest(unittest.TestCase):
@@ -37,6 +40,18 @@ class InitSchemaTest(unittest.TestCase):
         mode = self.conn.execute("PRAGMA journal_mode").fetchone()[0]
         # In-memory databases report "memory"; on-disk would be "wal".
         self.assertIn(mode, ("wal", "memory"))
+
+
+class ConnectPermsTest(unittest.TestCase):
+    def test_db_file_is_owner_only(self):
+        # The DB is a longitudinal record of network behavior; restrict it to
+        # the owner (0600) so other local users can't read it at rest.
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "appband.db"
+            conn = connect(db_path)
+            conn.close()
+            mode = os.stat(db_path).st_mode & 0o777
+            self.assertEqual(oct(mode), oct(0o600))
 
 
 if __name__ == "__main__":

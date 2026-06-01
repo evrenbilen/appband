@@ -1,6 +1,7 @@
 """appband HTTP server: localhost-only JSON API + static dashboard."""
 from __future__ import annotations
 
+import ipaddress
 import json
 import logging
 import sqlite3
@@ -13,6 +14,18 @@ from appband.config import load_config
 
 log = logging.getLogger("appband.server")
 WEB_ROOT = Path(__file__).parent / "web"
+
+
+def _is_loopback_name(name: str | None) -> bool:
+    """True if a hostname refers to the local machine (127.0.0.0/8, ::1, localhost)."""
+    if not name:
+        return False
+    if name.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(name).is_loopback
+    except ValueError:
+        return False
 
 
 def _qint(qs: dict, key: str, default: int) -> int:
@@ -36,9 +49,24 @@ def build_handler(db_path: Path) -> type:
         def log_message(self, *args):
             pass  # suppress noisy stderr; file log captures activity
 
+        # Locked-down CSP: the dashboard makes zero external requests (Chart.js
+        # is self-hosted under /static/vendor/). 'unsafe-inline' is needed only
+        # for style attributes in the markup; scripts are 'self' only.
+        _CSP = (
+            "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; connect-src 'self'; "
+            "base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+        )
+
+        def _security_headers(self) -> None:
+            self.send_header("Content-Security-Policy", self._CSP)
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Referrer-Policy", "no-referrer")
+
         def _json(self, payload, status=200):
             body = json.dumps(payload, default=str).encode("utf-8")
             self.send_response(status)
+            self._security_headers()
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
@@ -61,12 +89,26 @@ def build_handler(db_path: Path) -> type:
                 ".json": "application/json; charset=utf-8",
             }.get(ext, "application/octet-stream")
             self.send_response(200)
+            self._security_headers()
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
 
         def do_GET(self):  # noqa: N802
+            # DNS-rebinding / cross-origin defense. Binding 127.0.0.1 does not
+            # stop a malicious page the user has open from rebinding its domain
+            # to 127.0.0.1 and reading this unauthenticated API. Require the
+            # Host (and any Origin) to resolve to loopback.
+            host_name = urlparse("//" + (self.headers.get("Host") or "")).hostname
+            if not _is_loopback_name(host_name):
+                self._error(403, "forbidden: non-loopback Host header")
+                return
+            origin = self.headers.get("Origin")
+            if origin is not None and not _is_loopback_name(urlparse(origin).hostname):
+                self._error(403, "forbidden: cross-origin request")
+                return
+
             parsed = urlparse(self.path)
             qs = parse_qs(parsed.query)
             path = parsed.path

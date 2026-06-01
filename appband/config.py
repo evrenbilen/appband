@@ -1,9 +1,23 @@
 """appband config: dataclass with defaults + optional JSON override."""
 from __future__ import annotations
 
+import ipaddress
 import json
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
+
+log = logging.getLogger("appband.config")
+
+
+def _is_loopback_host(name: str) -> bool:
+    """True if name binds the server to the local machine only (127.0.0.0/8, ::1, localhost)."""
+    if name.lower() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(name).is_loopback
+    except ValueError:
+        return False
 
 
 def _default_db_path() -> Path:
@@ -46,4 +60,14 @@ def load_config(override_path: Path | None = None) -> Config:
             if isinstance(current, Path):
                 value = Path(value).expanduser()
             setattr(cfg, key, value)
+    # Localhost-only is a hard constraint: a routable bind_host (from a tampered
+    # or mistaken config) would expose the unauthenticated API to the network.
+    # Refuse it and fall back to loopback rather than binding off-localhost.
+    if not _is_loopback_host(str(cfg.bind_host)):
+        log.warning(
+            "bind_host %r is not loopback; refusing to expose the API off-localhost, "
+            "falling back to 127.0.0.1",
+            cfg.bind_host,
+        )
+        cfg.bind_host = "127.0.0.1"
     return cfg

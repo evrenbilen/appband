@@ -1,8 +1,12 @@
 """SQLite schema and connection helpers for appband."""
 from __future__ import annotations
 
+import logging
+import os
 import sqlite3
 from pathlib import Path
+
+log = logging.getLogger("appband.db")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
@@ -80,6 +84,12 @@ def connect(db_path: Path) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path), isolation_level=None, timeout=10.0, check_same_thread=False)
     init_schema(conn)
+    # The DB is a longitudinal record of network behavior — restrict it to the
+    # owner so other local users can't read it at rest. (Not encrypted.)
+    try:
+        os.chmod(db_path, 0o600)
+    except OSError as e:
+        log.warning("could not chmod %s to 0600: %s", db_path, e)
     return conn
 
 

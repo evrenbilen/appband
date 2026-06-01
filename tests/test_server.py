@@ -53,6 +53,11 @@ class ServerTest(unittest.TestCase):
         with closing(urllib.request.urlopen(f"http://127.0.0.1:{self.port}{path}", timeout=2)) as resp:
             return resp.status, json.loads(resp.read())
 
+    def _raw_get(self, path: str, headers: dict | None = None):
+        req = urllib.request.Request(f"http://127.0.0.1:{self.port}{path}", headers=headers or {})
+        with closing(urllib.request.urlopen(req, timeout=2)) as resp:
+            return resp.status, resp.headers, resp.read()
+
     def test_current_returns_active_session(self):
         status, body = self._get("/api/current")
         self.assertEqual(status, 200)
@@ -132,6 +137,51 @@ class ServerTest(unittest.TestCase):
         names = {r["process_name"] for r in body["rows"]}
         self.assertIn("ProcD", names)
         self.assertNotIn("ProcC", names)
+
+    # ── Security: DNS-rebinding / cross-origin defense ──────────────────────
+    def test_rejects_non_loopback_host_header(self):
+        # DNS-rebinding: an attacker page rebinds evil.com -> 127.0.0.1, so the
+        # browser connects locally but sends Host: evil.com. Must be refused.
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            self._raw_get("/api/current", {"Host": "evil.com"})
+        self.assertEqual(ctx.exception.code, 403)
+
+    def test_rejects_cross_origin_request(self):
+        # A page on another origin fetching the local API sends its Origin.
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            self._raw_get("/api/current", {"Origin": "http://evil.com"})
+        self.assertEqual(ctx.exception.code, 403)
+
+    def test_allows_loopback_host_and_origin(self):
+        status, _, _ = self._raw_get("/api/current", {"Origin": f"http://127.0.0.1:{self.port}"})
+        self.assertEqual(status, 200)
+
+    def test_security_headers_on_static(self):
+        status, headers, _ = self._raw_get("/")
+        self.assertEqual(status, 200)
+        self.assertIn("default-src 'none'", headers.get("Content-Security-Policy", ""))
+        self.assertIn("script-src 'self'", headers.get("Content-Security-Policy", ""))
+        self.assertEqual(headers.get("X-Content-Type-Options"), "nosniff")
+        self.assertEqual(headers.get("Referrer-Policy"), "no-referrer")
+
+    def test_security_headers_on_api(self):
+        _, headers, _ = self._raw_get("/api/current")
+        self.assertIn("default-src 'none'", headers.get("Content-Security-Policy", ""))
+        self.assertEqual(headers.get("X-Content-Type-Options"), "nosniff")
+
+    def test_chartjs_is_self_hosted(self):
+        status, headers, body = self._raw_get("/static/vendor/chart.umd.min.js")
+        self.assertEqual(status, 200)
+        self.assertIn("javascript", headers.get("Content-Type", ""))
+        self.assertGreater(len(body), 1000)
+
+    def test_dashboard_loads_no_external_scripts(self):
+        # A locally-served, CDN-free dashboard is required by both the
+        # localhost-only spirit and the strict script-src 'self' CSP.
+        _, _, body = self._raw_get("/")
+        html = body.decode("utf-8")
+        self.assertNotIn("cdn.jsdelivr.net", html)
+        self.assertIn("/static/vendor/chart.umd.min.js", html)
 
     def test_by_process_scope_all_returns_all(self):
         setup_conn = sqlite3.connect(self.db_file)

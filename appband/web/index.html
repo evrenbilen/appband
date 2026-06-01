@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AppBand</title>
   <link rel="stylesheet" href="/static/style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
+  <!-- Self-hosted Chart.js so the dashboard makes zero external requests (works
+       offline / behind captive portals) and satisfies the strict script-src 'self'
+       CSP. Pinned: chart.js@4.4.0 umd min, sha256
+       0e2326c6868072bec1592760c6729043caeea2960a2b46cee6a2192aac6abff0 -->
+  <script src="/static/vendor/chart.umd.min.js" defer></script>
   <script type="module" src="/static/app.js"></script>
 </head>
 <body>

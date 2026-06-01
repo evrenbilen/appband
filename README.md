@@ -131,6 +131,13 @@ DB schema: `sessions`, `interface_samples`, `process_samples`, `connections`, `d
 
 AppBand binds to `127.0.0.1` only — it cannot be reached from your network. All data stays on disk in `~/Library/Application Support/appband/`. Nothing is uploaded.
 
+Defense in depth for the local surface:
+
+- The HTTP API **validates the `Host` (and any `Origin`) header** and rejects anything that isn't loopback, so a malicious web page you have open can't reach the API via DNS-rebinding.
+- A non-loopback `bind_host` in a config override is **refused** — the server always falls back to `127.0.0.1`.
+- The dashboard is fully **self-contained**: it loads Chart.js from disk (`/static/vendor/`), so it makes **zero external requests** and works offline / behind captive portals. A strict Content-Security-Policy enforces this.
+- The database is created **owner-only (`0600`)**. Note it is **not encrypted at rest** — anyone who can read your home directory as your user can read it. Use FileVault for at-rest encryption.
+
 ## License
 
 MIT — see [LICENSE](./LICENSE).

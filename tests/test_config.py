@@ -32,6 +32,23 @@ class ConfigTest(unittest.TestCase):
         cfg = load_config(Path("/nonexistent/path.json"))
         self.assertEqual(cfg.port, 8765)
 
+    def _load_with(self, data: dict) -> Config:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "config.json"
+            path.write_text(json.dumps(data))
+            return load_config(path)
+
+    def test_clamps_non_loopback_bind_host_to_loopback(self):
+        # The localhost-only constraint must survive a tampered config: a
+        # routable bind_host would expose the unauthenticated API to the LAN.
+        self.assertEqual(self._load_with({"bind_host": "0.0.0.0"}).bind_host, "127.0.0.1")
+        self.assertEqual(self._load_with({"bind_host": "192.168.1.5"}).bind_host, "127.0.0.1")
+
+    def test_allows_loopback_bind_hosts(self):
+        self.assertEqual(self._load_with({"bind_host": "::1"}).bind_host, "::1")
+        self.assertEqual(self._load_with({"bind_host": "localhost"}).bind_host, "localhost")
+        self.assertEqual(self._load_with({"bind_host": "127.0.0.2"}).bind_host, "127.0.0.2")
+
 
 if __name__ == "__main__":
     unittest.main()
