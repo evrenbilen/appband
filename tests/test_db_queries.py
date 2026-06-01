@@ -103,6 +103,8 @@ class DbQueryTest(unittest.TestCase):
         self.assertEqual((allg[0]["start"], allg[0]["end"]), (1000, 2000))
         # Only gaps overlapping the window are returned.
         self.assertEqual(len(get_gaps(self.conn, 4000, 10000)), 1)
+        # A gap ending exactly at the window start does NOT overlap [from, to).
+        self.assertEqual(get_gaps(self.conn, 2000, 3000), [])
 
     def test_heartbeat_record_and_read(self):
         record_heartbeat(self.conn, "iface", 1000)

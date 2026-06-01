@@ -303,7 +303,7 @@ def record_gap(conn: sqlite3.Connection, start_ts: int, end_ts: int) -> None:
 def get_gaps(conn: sqlite3.Connection, from_ts: int, to_ts: int) -> list[dict]:
     """Return gaps overlapping the [from_ts, to_ts) window."""
     cur = conn.execute(
-        "SELECT start_ts, end_ts FROM gaps WHERE end_ts >= ? AND start_ts < ? ORDER BY start_ts",
+        "SELECT start_ts, end_ts FROM gaps WHERE end_ts > ? AND start_ts < ? ORDER BY start_ts",
         (from_ts, to_ts),
     )
     return [{"start": r[0], "end": r[1]} for r in cur.fetchall()]

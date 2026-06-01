@@ -33,8 +33,8 @@ from appband.session_watcher import SessionWatcher, collect_snapshot
 
 log = logging.getLogger("appband.collector")
 
-# A jump larger than this between session ticks (which fire every ~2s) means
-# collection was suspended (sleep/wake) — recorded as a gap.
+# A jump of this many seconds or more between session ticks (which fire every
+# ~2s) means collection was suspended (sleep/wake) — recorded as a gap.
 GAP_THRESHOLD_SEC = 60
 
 # Thread-local storage — each writer thread gets its own sqlite3.Connection.
@@ -279,7 +279,7 @@ def main(config_path: Path | None = None) -> int:
             if now - last_run >= cfg.session_poll_sec:
                 # A big jump since the last 2s tick = the machine slept; record
                 # the gap so the dashboard shows downtime, not phantom idle.
-                if last_run and (now - last_run) > GAP_THRESHOLD_SEC:
+                if last_run and (now - last_run) >= GAP_THRESHOLD_SEC:
                     try:
                         record_gap(_conn(state), last_run, now)
                     except Exception:  # noqa: BLE001
