@@ -109,6 +109,29 @@ class CollectorTickTest(unittest.TestCase):
         self.assertEqual(set(enqueued), {"1.2.3.4", "5.6.7.8"})
 
 
+class RunToolTest(unittest.TestCase):
+    def test_missing_tool_returns_empty_and_logs_error_once(self):
+        from appband.collector import _missing_tools, _run
+
+        _missing_tools.clear()
+        with patch("appband.collector.subprocess.run", side_effect=FileNotFoundError("/usr/bin/nope")):
+            with self.assertLogs("appband.collector", level="ERROR") as cm:
+                self.assertEqual(_run(["/usr/bin/nope"]), "")
+            self.assertTrue(any("not found" in m for m in cm.output))
+            # already reported — must not log ERROR again (no per-tick spam)
+            with self.assertNoLogs("appband.collector", level="ERROR"):
+                self.assertEqual(_run(["/usr/bin/nope"]), "")
+        _missing_tools.clear()
+
+    def test_transient_failure_returns_empty(self):
+        import subprocess as _sp
+
+        from appband.collector import _run
+
+        with patch("appband.collector.subprocess.run", side_effect=_sp.TimeoutExpired("cmd", 5)):
+            self.assertEqual(_run(["/usr/bin/nettop"]), "")
+
+
 class SetupLoggingTest(unittest.TestCase):
     def test_uses_rotating_file_handler(self):
         # Long-lived LaunchAgents must not grow their log file unbounded.

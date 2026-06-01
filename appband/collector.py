@@ -61,12 +61,25 @@ def _conn(state: CollectorState) -> sqlite3.Connection:
     return _thread_local.conn
 
 
+# Tools reported missing (FileNotFoundError) — logged once each, not per tick.
+_missing_tools: set[str] = set()
+
+
 def _run(cmd: list[str]) -> str:
     try:
         out = subprocess.run(
             cmd, capture_output=True, text=True, timeout=5, check=False
         )
         return out.stdout
+    except FileNotFoundError:
+        # A missing required tool is a persistent, actionable condition — report
+        # it once at ERROR (not a per-tick WARNING flood) so a stripped-down
+        # macOS surfaces a clear cause instead of a silently empty dashboard.
+        tool = cmd[0]
+        if tool not in _missing_tools:
+            _missing_tools.add(tool)
+            log.error("required tool not found: %s — is it available on this macOS?", tool)
+        return ""
     except (subprocess.SubprocessError, OSError) as e:
         log.warning("subprocess failed: %s: %s", cmd, e)
         return ""
