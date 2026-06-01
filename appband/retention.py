@@ -29,10 +29,12 @@ def purge_old(
     sess_deleted = cur.rowcount
     cur = conn.execute("DELETE FROM dns_cache WHERE resolved_at < ?", (dns_cutoff,))
     dns_deleted = cur.rowcount
+    cur = conn.execute("DELETE FROM gaps WHERE end_ts < ?", (sample_cutoff,))
+    gaps_deleted = cur.rowcount
 
     log.info(
-        "purge: iface=%d proc=%d conn=%d sess=%d dns=%d",
-        iface_deleted, proc_deleted, conn_deleted, sess_deleted, dns_deleted,
+        "purge: iface=%d proc=%d conn=%d sess=%d dns=%d gaps=%d",
+        iface_deleted, proc_deleted, conn_deleted, sess_deleted, dns_deleted, gaps_deleted,
     )
 
 

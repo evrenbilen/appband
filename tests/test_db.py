@@ -26,6 +26,7 @@ class InitSchemaTest(unittest.TestCase):
                 "collector_health",
                 "connections",
                 "dns_cache",
+                "gaps",
                 "interface_samples",
                 "process_samples",
                 "sessions",

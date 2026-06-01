@@ -353,6 +353,19 @@ class ServerTest(unittest.TestCase):
         q = next(r for r in body["rows"] if r["process_name"] == "Q")
         self.assertEqual(q["bytes_in"], 500)
 
+    def test_api_gaps(self):
+        from appband.db import record_gap
+        setup = sqlite3.connect(self.db_file)
+        init_schema(setup)
+        record_gap(setup, 1000, 2000)
+        setup.commit()
+        setup.close()
+        status, body = self._get("/api/gaps?from=0&to=10000")
+        self.assertEqual(status, 200)
+        self.assertEqual(len(body["gaps"]), 1)
+        self.assertEqual(body["gaps"][0]["start"], 1000)
+        self.assertEqual(body["gaps"][0]["end"], 2000)
+
     def test_by_port_groups_and_labels(self):
         setup = sqlite3.connect(self.db_file)
         init_schema(setup)

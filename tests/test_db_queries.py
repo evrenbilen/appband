@@ -15,6 +15,8 @@ from appband.db import (
     record_heartbeat,
     get_health,
     close_orphan_sessions,
+    record_gap,
+    get_gaps,
 )
 
 
@@ -92,6 +94,15 @@ class DbQueryTest(unittest.TestCase):
         s = open_session(self.conn, 1000, "en0", "wifi", "A", None, "1.1.1.1")
         close_orphan_sessions(self.conn, now=5000)
         self.assertEqual(get_active_session(self.conn)["id"], s)  # still open
+
+    def test_gap_record_and_read_with_overlap_filter(self):
+        record_gap(self.conn, 1000, 2000)   # machine slept 1000..2000
+        record_gap(self.conn, 5000, 5050)
+        allg = get_gaps(self.conn, 0, 10000)
+        self.assertEqual(len(allg), 2)
+        self.assertEqual((allg[0]["start"], allg[0]["end"]), (1000, 2000))
+        # Only gaps overlapping the window are returned.
+        self.assertEqual(len(get_gaps(self.conn, 4000, 10000)), 1)
 
     def test_heartbeat_record_and_read(self):
         record_heartbeat(self.conn, "iface", 1000)

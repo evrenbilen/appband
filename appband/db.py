@@ -70,6 +70,13 @@ CREATE TABLE IF NOT EXISTS collector_health (
   poller       TEXT PRIMARY KEY,
   last_ok_ts   INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS gaps (
+  id        INTEGER PRIMARY KEY,
+  start_ts  INTEGER NOT NULL,
+  end_ts    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_gaps_end ON gaps(end_ts);
 """
 
 
@@ -285,6 +292,21 @@ def get_health(conn: sqlite3.Connection) -> dict:
     """Return {poller: last_ok_ts} for all recorded pollers."""
     cur = conn.execute("SELECT poller, last_ok_ts FROM collector_health")
     return {r[0]: r[1] for r in cur.fetchall()}
+
+
+def record_gap(conn: sqlite3.Connection, start_ts: int, end_ts: int) -> None:
+    """Record an interval where collection was suspended (sleep/wake), so the
+    dashboard can distinguish 'we weren't watching' from 'genuinely 0 traffic'."""
+    conn.execute("INSERT INTO gaps (start_ts, end_ts) VALUES (?, ?)", (start_ts, end_ts))
+
+
+def get_gaps(conn: sqlite3.Connection, from_ts: int, to_ts: int) -> list[dict]:
+    """Return gaps overlapping the [from_ts, to_ts) window."""
+    cur = conn.execute(
+        "SELECT start_ts, end_ts FROM gaps WHERE end_ts >= ? AND start_ts < ? ORDER BY start_ts",
+        (from_ts, to_ts),
+    )
+    return [{"start": r[0], "end": r[1]} for r in cur.fetchall()]
 
 
 def query_timeseries(

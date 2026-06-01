@@ -193,6 +193,9 @@ def build_handler(db_path: Path) -> type:
                 elif path == "/api/by-port":
                     limit = _qint(qs, "limit", 20)
                     self._json({"rows": self._by_port(conn, from_ts, to_ts, limit, ssid, link_type)})
+                elif path == "/api/gaps":
+                    from appband.db import get_gaps
+                    self._json({"gaps": get_gaps(conn, from_ts, to_ts)})
                 else:
                     self._error(404, "not found")
             except (BrokenPipeError, ConnectionResetError):
