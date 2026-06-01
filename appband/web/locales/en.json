@@ -32,6 +32,7 @@
   "panel.timeseries.title": "Time Series",
   "panel.timeseries.gaps_note": "{count} collection gap(s) in this range — traffic wasn't recorded then (sleep/wake or the collector was down).",
   "panel.by_network.title": "By Network",
+  "panel.by_port.title": "By Port",
   "panel.by_process.title": "By App",
   "panel.by_domain.title": "By Domain",
   "panel.by_domain.note": "approximate",
@@ -43,6 +44,9 @@
   "table.network": "Network",
   "table.download": "↓ Download",
   "table.upload": "↑ Upload",
+  "table.port": "Port",
+  "table.service": "Service",
+  "table.connections": "Connections",
 
   "state.loading": "Loading…",
   "state.empty": "No data in this range.",

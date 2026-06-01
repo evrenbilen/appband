@@ -91,4 +91,13 @@ test.describe("AppBand dashboard", () => {
     await page.goto("/");
     await expect(page.locator("#panel-timeseries .gap-note")).toBeVisible({ timeout: 10_000 });
   });
+
+  test("By Port lists ports with service labels", async ({ page }) => {
+    // serve-test.py seeds connections to :443; /api/by-port labels it HTTPS.
+    await page.goto("/");
+    const table = page.locator("#panel-port .data-table");
+    await expect(table).toBeVisible({ timeout: 10_000 });
+    await expect(table).toContainText("443");
+    await expect(table).toContainText("HTTPS");
+  });
 });

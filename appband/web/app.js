@@ -659,6 +659,41 @@ async function loadByDomain() {
   }
 }
 
+/* ─── Load: By Port ──────────────────────────────────────────────────────── */
+async function loadByPort() {
+  const containerId = "port-body";
+  try {
+    const { from, to } = rangeBounds();
+    const data = await fetchJson(`/api/by-port?from=${from}&to=${to}&limit=12${netParam()}`);
+    if (!data.rows || data.rows.length === 0) {
+      showEmpty(containerId);
+      return;
+    }
+    const el = $(containerId);
+    if (!el) return;
+    el.innerHTML = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>${esc(t("table.port"))}</th>
+            <th>${esc(t("table.service"))}</th>
+            <th class="num">${esc(t("table.connections"))}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.rows.map((r) => `
+            <tr>
+              <td>${esc(r.port)}</td>
+              <td>${esc(r.service || "—")}</td>
+              <td class="num">${esc(r.count)}</td>
+            </tr>`).join("")}
+        </tbody>
+      </table>`;
+  } catch (err) {
+    showError(containerId, loadByPort);
+  }
+}
+
 /* ─── Refresh groups ─────────────────────────────────────────────────────── */
 async function refreshFast() {
   await loadCurrent();
@@ -673,6 +708,7 @@ async function refreshAll() {
     loadByNetwork(),
     loadByProcess(),
     loadByDomain(),
+    loadByPort(),
   ]);
 }
 

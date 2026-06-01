@@ -32,6 +32,7 @@
   "panel.timeseries.title": "Zaman Serisi",
   "panel.timeseries.gaps_note": "Bu aralıkta {count} toplama boşluğu — o sırada trafik kaydedilmedi (uyku/uyanma veya toplayıcı kapalıydı).",
   "panel.by_network.title": "Ağa göre",
+  "panel.by_port.title": "Port'a göre",
   "panel.by_process.title": "Uygulamaya göre",
   "panel.by_domain.title": "Domain'lere göre",
   "panel.by_domain.note": "yaklaşık",
@@ -43,6 +44,9 @@
   "table.network": "Ağ",
   "table.download": "↓ İndirme",
   "table.upload": "↑ Yükleme",
+  "table.port": "Port",
+  "table.service": "Servis",
+  "table.connections": "Bağlantı",
 
   "state.loading": "Yükleniyor…",
   "state.empty": "Bu aralıkta veri yok.",
