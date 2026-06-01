@@ -18,3 +18,8 @@ venv/
 # Internal development notes (not for public release)
 docs/internal/
 docs/superpowers/
+
+# Mac app build artifacts
+mac-app/.build/
+mac-app/AppBand.app/
+*.dmg

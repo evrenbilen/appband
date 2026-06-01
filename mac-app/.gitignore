@@ -1,0 +1,4 @@
+.build/
+AppBand.app/
+*.dmg
+.DS_Store
