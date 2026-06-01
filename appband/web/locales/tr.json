@@ -34,6 +34,7 @@
   "panel.by_process.title": "Uygulamaya göre",
   "panel.by_domain.title": "Domain'lere göre",
   "panel.by_domain.note": "yaklaşık",
+  "panel.approx_help": "Yaklaşık: her uygulamanın byte'ları, aynı 5 dakikalık pencerede dokunduğu host'lara/kapsama bölüştürülür. Kesin muhasebe değil, \"trafik muhtemelen buraya gitti\" olarak okuyun.",
 
   "legend.download": "İndirme",
   "legend.upload": "Yükleme",

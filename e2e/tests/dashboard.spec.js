@@ -77,4 +77,12 @@ test.describe("AppBand dashboard", () => {
     await page.selectOption("#ssid", "TestNet");
     await req; // throws if the network-scoped request is never made
   });
+
+  test("By Domain shows a visible approximate badge with an explainer", async ({ page }) => {
+    await page.goto("/");
+    const badge = page.locator("#panel-domain .approx-badge");
+    await expect(badge).toBeVisible();
+    const title = await badge.getAttribute("title");
+    expect((title || "").length).toBeGreaterThan(15); // the How-to-read explainer
+  });
 });

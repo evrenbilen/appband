@@ -34,6 +34,7 @@
   "panel.by_process.title": "By App",
   "panel.by_domain.title": "By Domain",
   "panel.by_domain.note": "approximate",
+  "panel.approx_help": "Approximate: each app's bytes are split across the hosts/scope it touched in the same 5-minute window. Treat this as \"where traffic probably went\", not exact accounting.",
 
   "legend.download": "Download",
   "legend.upload": "Upload",

@@ -221,6 +221,9 @@ function updateScopeBadges() {
     const el = $(id);
     if (el) el.textContent = label;
   }
+  // By App is exact only at scope=all; show the "approximate" badge otherwise.
+  const ab = $("approx-badge-process");
+  if (ab) ab.hidden = state.scope === "all";
 }
 
 /* ─── Load: Current ──────────────────────────────────────────────────────── */
