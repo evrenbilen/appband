@@ -1,6 +1,6 @@
 # AppBand
 
-**[Download AppBand 0.1.1 (DMG)](https://github.com/evrenbilen/appband/releases/latest)**  ·  macOS 13+  ·  ~500 KB
+**[Download AppBand 0.1.2 (DMG)](https://github.com/evrenbilen/appband/releases/latest)**  ·  macOS 13+  ·  ~500 KB
 
 **Per-App Bandwidth & Network Monitor for macOS**
 
@@ -24,7 +24,7 @@ AppBand is a local, privacy-respecting network usage monitor for macOS. It track
 
 ### Download the DMG (easiest)
 
-1. Download **AppBand-0.1.1.dmg** from the [latest release](https://github.com/evrenbilen/appband/releases/latest).
+1. Download **AppBand-0.1.2.dmg** from the [latest release](https://github.com/evrenbilen/appband/releases/latest).
 2. Open the DMG and drag **AppBand.app** to **Applications**.
 3. **First launch — Gatekeeper bypass.** AppBand is ad-hoc signed but not notarized (that requires a paid Apple Developer Program membership). On macOS 15+ Sequoia, double-clicking the first time shows *"Apple could not verify AppBand is free of malware"* with only **Move to Trash** / **Done** buttons. Use one of these to unblock it:
 
