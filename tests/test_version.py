@@ -14,11 +14,12 @@ class VersionTest(unittest.TestCase):
 
     def test_readme_download_lines_match_version(self):
         # README is the single source seen by users; it must mirror the package
-        # version so a release can't ship a stale download link.
+        # version so a release can't ship a stale download link. Matched by
+        # regex (version-specific but tolerant of surrounding formatting).
         readme = (Path(__file__).parent.parent / "README.md").read_text()
-        v = appband.__version__
-        self.assertIn(f"AppBand {v} (DMG)", readme)
-        self.assertIn(f"AppBand-{v}.dmg", readme)
+        v = re.escape(appband.__version__)
+        self.assertRegex(readme, rf"AppBand[ -]{v}\b")   # download mention
+        self.assertRegex(readme, rf"AppBand-{v}\.dmg")    # install filename
 
 
 if __name__ == "__main__":

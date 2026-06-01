@@ -33,6 +33,9 @@ VERSION="$(PYTHONPATH="$REPO" python3 -c "import appband; print(appband.__versio
 [ -n "$VERSION" ] || { echo "could not read appband.__version__"; exit 1; }
 echo "version: $VERSION"
 sed "s|__VERSION__|$VERSION|g" "$HERE/Sources/AppBand/Info.plist" > "$APP/Contents/Info.plist"
+# sed exits 0 even if the placeholder never matched — verify the injection.
+grep -q "<string>$VERSION</string>" "$APP/Contents/Info.plist" \
+  || { echo "version injection failed: __VERSION__ not substituted in Info.plist"; exit 1; }
 
 echo "=== 4. Bundle Python backend into Resources ==="
 mkdir -p "$APP/Contents/Resources/backend"
