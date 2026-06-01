@@ -3,6 +3,7 @@ import os
 import sqlite3
 import tempfile
 import threading
+import time
 import unittest
 import urllib.request
 import urllib.error
@@ -64,6 +65,44 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(body["session"]["ssid"], "Office")
         self.assertIn("bytes_in_60s", body)
         self.assertIn("bytes_out_60s", body)
+
+    def test_current_includes_exact_top_apps(self):
+        # The headline live view: top apps by exact process_samples bytes over
+        # the last 60s, ranked by total, no approximation.
+        now = int(time.time())
+        setup = sqlite3.connect(self.db_file)
+        init_schema(setup)
+        sid = setup.execute("SELECT id FROM sessions WHERE ended_at IS NULL LIMIT 1").fetchone()[0]
+        insert_process_sample(setup, ts=now - 5, session_id=sid, process_name="Safari", pid=1, bytes_in=900, bytes_out=100)
+        insert_process_sample(setup, ts=now - 5, session_id=sid, process_name="Mail", pid=2, bytes_in=40, bytes_out=10)
+        setup.commit()
+        setup.close()
+        status, body = self._get("/api/current")
+        self.assertEqual(status, 200)
+        self.assertIn("top_apps", body)
+        self.assertEqual(body["top_apps"][0]["process_name"], "Safari")
+        self.assertEqual(body["top_apps"][0]["bytes_in"], 900)
+        self.assertEqual(body["top_apps"][0]["bytes_out"], 100)
+        names = [a["process_name"] for a in body["top_apps"]]
+        self.assertEqual(names, ["Safari", "Mail"])  # ranked by total desc
+
+    def test_current_includes_coverage(self):
+        # Coverage = how much of the exact interface total we attributed to
+        # processes, so users understand why per-app sums < the headline total.
+        now = int(time.time())
+        setup = sqlite3.connect(self.db_file)
+        init_schema(setup)
+        sid = setup.execute("SELECT id FROM sessions WHERE ended_at IS NULL LIMIT 1").fetchone()[0]
+        insert_interface_sample(setup, ts=now - 5, session_id=sid, bytes_in=600, bytes_out=400)  # total 1000
+        insert_process_sample(setup, ts=now - 5, session_id=sid, process_name="Safari", pid=1, bytes_in=500, bytes_out=300)  # total 800
+        setup.commit()
+        setup.close()
+        status, body = self._get("/api/current")
+        self.assertEqual(status, 200)
+        self.assertIn("coverage", body)
+        self.assertEqual(body["coverage"]["total_bytes"], 1000)
+        self.assertEqual(body["coverage"]["attributed_bytes"], 800)
+        self.assertEqual(body["coverage"]["pct"], 80)
 
     def test_sessions_lists_with_default_range(self):
         status, body = self._get("/api/sessions")

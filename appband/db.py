@@ -201,8 +201,8 @@ def query_timeseries(
     to_ts: int,
     granularity: str = "hour",
 ) -> list[dict]:
-    """Aggregate interface_samples into time buckets."""
-    bucket = 3600 if granularity == "hour" else 86400
+    """Aggregate interface_samples into time buckets (minute / hour / day)."""
+    bucket = {"minute": 60, "hour": 3600, "day": 86400}.get(granularity, 3600)
     cur = conn.execute(
         f"""
         SELECT (ts / {bucket}) * {bucket} AS bucket,

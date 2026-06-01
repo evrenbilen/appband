@@ -61,6 +61,19 @@ class DbQueryTest(unittest.TestCase):
         self.assertIsNone(get_dns_hostname(self.conn, "9.9.9.9"))
         self.assertIsNone(get_dns_hostname(self.conn, "missing.ip"))
 
+    def test_timeseries_minute_aggregation(self):
+        sid = open_session(self.conn, 0, "en0", "wifi", "Office", None, "192.168.1.42")
+        # Two samples in minute-bucket [0,60), one in [120,180); bucket [60,120) empty.
+        for ts, bi, bo in [(10, 100, 10), (50, 100, 10), (130, 200, 20)]:
+            insert_interface_sample(self.conn, ts=ts, session_id=sid, bytes_in=bi, bytes_out=bo)
+        result = query_timeseries(self.conn, from_ts=0, to_ts=300, granularity="minute")
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0]["ts"], 0)
+        self.assertEqual(result[0]["bytes_in"], 200)
+        self.assertEqual(result[0]["bytes_out"], 20)
+        self.assertEqual(result[1]["ts"], 120)
+        self.assertEqual(result[1]["bytes_in"], 200)
+
     def test_timeseries_hourly_aggregation(self):
         sid = open_session(self.conn, 0, "en0", "wifi", "Office", None, "192.168.1.42")
         # 4 samples within the same hour (3600 sec window starting at 0)

@@ -171,7 +171,43 @@ def build_handler(db_path: Path) -> type:
                 (now - 60,),
             )
             bi, bo = cur.fetchone()
-            return {"session": session, "bytes_in_60s": bi, "bytes_out_60s": bo}
+            # Exact (not approximate) per-app usage over the last 60s — the live
+            # "what is eating my bandwidth right now" view. process_samples bytes
+            # are exact; this needs no scope distribution.
+            cur = conn.execute(
+                "SELECT process_name, COALESCE(SUM(bytes_in), 0), COALESCE(SUM(bytes_out), 0) "
+                "FROM process_samples WHERE ts >= ? "
+                "GROUP BY process_name "
+                "ORDER BY SUM(bytes_in) + SUM(bytes_out) DESC LIMIT 5",
+                (now - 60,),
+            )
+            top_apps = [
+                {"process_name": r[0], "bytes_in": r[1], "bytes_out": r[2]}
+                for r in cur.fetchall()
+            ]
+            # Coverage: how much of the exact interface total we attributed to
+            # processes. nettop's per-process external bytes never sum to the
+            # route total (kernel/system traffic, sampling gaps), so surface the
+            # gap instead of letting users conclude the per-app numbers "lie".
+            cur = conn.execute(
+                "SELECT COALESCE(SUM(bytes_in), 0) + COALESCE(SUM(bytes_out), 0) "
+                "FROM process_samples WHERE ts >= ?",
+                (now - 60,),
+            )
+            attributed = cur.fetchone()[0]
+            total = (bi or 0) + (bo or 0)
+            coverage = {
+                "total_bytes": total,
+                "attributed_bytes": attributed,
+                "pct": round(attributed / total * 100) if total > 0 else None,
+            }
+            return {
+                "session": session,
+                "bytes_in_60s": bi,
+                "bytes_out_60s": bo,
+                "top_apps": top_apps,
+                "coverage": coverage,
+            }
 
         def _sessions(self, conn: sqlite3.Connection, from_ts: int, to_ts: int) -> list[dict]:
             cur = conn.execute(
