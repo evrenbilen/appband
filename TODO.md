@@ -60,12 +60,12 @@ Veri zaten tam (`scope=all` → `approximate:false`); backend sadece canlı/ince
 - [ ] **DEFERLENDİ** Collector öz-metrikleri (düşen tick, izlenen anahtar, DNS kuyruk derinliği) (M, med) — değerli ama P1-B/P1-C kullanıcı-yüzü kurtarmadan düşük öncelikli. P2'ye taşındı.
 - [x] **(bonus)** Server: istemci kopması (BrokenPipe/ConnectionReset) sessiz ele alınıyor — `115ee0f` (e2e doğruladı: 0 traceback)
 
-### [ ] EPIC P1-B: Mac uygulaması — hata görünürlüğü, kurtarma, kalıcılık
-- [ ] Yutulan `BackendInstaller` hatasını NSAlert ile göster (S, high — doğrulanmış) (`mac-app/Sources/AppBand/AppBandApp.swift`, `BackendInstaller.swift`)
-- [ ] "connecting" vs "offline" ayrımı + tek-tık **Restart Services** (`launchctl kickstart`) (M, high) (`NetworkMonitor.swift`, `LivePopover.swift`)
-- [ ] SMAppService ile "Girişte Başlat" toggle'ı (macOS 13 hedefi tam minimum) (M, med) (`LivePopover.swift`, `AppBandApp.swift`)
-- [ ] Uygulama-içi Uninstall akışı (`uninstall.sh --purge`'ü Process ile çağır) (M, med) (`AppBandApp.swift`, `BackendInstaller.swift`)
-- [ ] 1Hz başlık timer'ını 5 sn'lik monitor refresh'e birleştir (S, low — idle güç) (`AppBandApp.swift`, `NetworkMonitor.swift`)
+### [x] EPIC P1-B: Mac uygulaması — hata görünürlüğü, kurtarma, kalıcılık  ·  **TAMAMLANDI** (build geçiyor; Swift, unittest yok)
+- [x] Yutulan `BackendInstaller` hatasını NSAlert ile göster (S, high) — `9e19bcf`
+- [x] "connecting" vs "offline" ayrımı (3-durum) + tek-tık **Restart Services** (`launchctl kickstart -k`) (M, high) — `9e19bcf`
+- [x] SMAppService ile "Girişte Başlat" toggle'ı (M, med) — `3c47cd1`
+- [x] Uygulama-içi Uninstall akışı (NSAlert + suppression-checkbox → `uninstall.sh --purge`) (M, med) — `3c47cd1`
+- [x] 1Hz başlık timer'ı → Combine sink (`$menuBarTitle`) (S, low — idle güç) — `3c47cd1`
 
 ### [ ] EPIC P1-C: Dashboard doğruluğu + dürüstlüğü
 - [ ] Ölü SSID filtresini bağla (`state.ssid` hiçbir fetch'e eklenmiyor) **+ `process_samples`/`connections` için `session_id` index'i** (M, high) (`appband/web/app.js`, `appband/server.py`, `appband/db.py`, `tests/test_server.py`)
