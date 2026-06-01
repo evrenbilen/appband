@@ -169,6 +169,9 @@ def main(config_path: Path | None = None) -> int:
 
     # Run schema migration once at startup with a short-lived connection.
     # Each worker thread will open its own connection lazily via _conn().
+    # connect() may raise sqlite3.OperationalError if the DB is locked by
+    # another process at startup; that's transient and launchd (KeepAlive +
+    # ThrottleInterval=10) retries. It only quarantines on real corruption.
     bootstrap = connect(cfg.db_path)
     close_orphan_sessions(bootstrap, int(time.time()))  # reconcile unclean shutdowns
     bootstrap.close()

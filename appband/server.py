@@ -182,7 +182,7 @@ def build_handler(db_path: Path) -> type:
         def _current(self, conn: sqlite3.Connection, now: int) -> dict:
             cur = conn.execute(
                 "SELECT id, started_at, interface, link_type, ssid, ip_address "
-                "FROM sessions WHERE ended_at IS NULL ORDER BY started_at DESC LIMIT 1"
+                "FROM sessions WHERE ended_at IS NULL ORDER BY started_at DESC, id DESC LIMIT 1"
             )
             row = cur.fetchone()
             session = None

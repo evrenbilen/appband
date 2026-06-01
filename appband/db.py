@@ -172,7 +172,7 @@ def close_orphan_sessions(conn: sqlite3.Connection, now: int) -> None:
         "UPDATE sessions SET ended_at = ? "
         "WHERE ended_at IS NULL AND id NOT IN ("
         "  SELECT id FROM sessions WHERE ended_at IS NULL "
-        "  ORDER BY started_at DESC LIMIT 1"
+        "  ORDER BY started_at DESC, id DESC LIMIT 1"
         ")",
         (now,),
     )
@@ -181,7 +181,7 @@ def close_orphan_sessions(conn: sqlite3.Connection, now: int) -> None:
 def get_active_session(conn: sqlite3.Connection) -> dict | None:
     cur = conn.execute(
         "SELECT id, started_at, ended_at, interface, link_type, ssid, bssid, ip_address "
-        "FROM sessions WHERE ended_at IS NULL ORDER BY started_at DESC LIMIT 1"
+        "FROM sessions WHERE ended_at IS NULL ORDER BY started_at DESC, id DESC LIMIT 1"
     )
     row = cur.fetchone()
     if row is None:

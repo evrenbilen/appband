@@ -79,6 +79,15 @@ class DbQueryTest(unittest.TestCase):
         self.assertEqual(open_count, 1)
         self.assertEqual(get_active_session(self.conn)["id"], c)
 
+    def test_close_orphan_sessions_breaks_ties_by_id(self):
+        # Sessions sharing a started_at second must resolve deterministically to
+        # the highest id (most recent insert), not by query-plan luck.
+        open_session(self.conn, 1000, "en0", "wifi", "A", None, "1.1.1.1")
+        open_session(self.conn, 1000, "en0", "wifi", "B", None, "1.1.1.2")
+        c = open_session(self.conn, 1000, "en0", "wifi", "C", None, "1.1.1.3")
+        close_orphan_sessions(self.conn, now=5000)
+        self.assertEqual(get_active_session(self.conn)["id"], c)
+
     def test_close_orphan_sessions_noop_when_one_open(self):
         s = open_session(self.conn, 1000, "en0", "wifi", "A", None, "1.1.1.1")
         close_orphan_sessions(self.conn, now=5000)
