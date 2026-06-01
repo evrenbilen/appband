@@ -17,6 +17,7 @@ if command -v create-dmg >/dev/null 2>&1; then
   echo "=== Using create-dmg ==="
   create-dmg \
     --volname "AppBand $VERSION" \
+    --background "$HERE/dmg-assets/background.png" \
     --window-pos 200 120 \
     --window-size 600 320 \
     --icon-size 96 \

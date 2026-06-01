@@ -2,7 +2,7 @@
 
 **Per-App Bandwidth & Network Monitor for macOS**
 
-**[⬇ Download AppBand 0.1.3 (DMG)](https://github.com/evrenbilen/appband/releases/latest)**  ·  macOS 13+  ·  ~500 KB
+**[⬇ Download AppBand 0.1.4 (DMG)](https://github.com/evrenbilen/appband/releases/latest)**  ·  macOS 13+  ·  ~500 KB
 
 ## Screenshots
 
@@ -38,7 +38,7 @@ AppBand is a local, privacy-respecting network usage monitor for macOS. It track
 
 ### Download the DMG (easiest)
 
-1. Download **AppBand-0.1.3.dmg** from the [latest release](https://github.com/evrenbilen/appband/releases/latest).
+1. Download **AppBand-0.1.4.dmg** from the [latest release](https://github.com/evrenbilen/appband/releases/latest).
 2. Open the DMG and drag **AppBand.app** to **Applications**.
 3. **First launch** — see the [Gatekeeper bypass](#gatekeeper-bypass-first-launch-only) section below to unblock the app on first open.
 4. On launch, AppBand installs the background services into `~/Library/Application Support/AppBand/` and opens the dashboard at http://127.0.0.1:8765/. A small ↓/↑ Mbps indicator appears in your menu bar.
