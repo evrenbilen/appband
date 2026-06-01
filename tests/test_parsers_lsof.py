@@ -1,6 +1,6 @@
 import unittest
 
-from appband.parsers.lsof import parse_lsof_connections
+from appband.parsers.lsof import _split_endpoint, parse_lsof_connections
 
 SAMPLE = (
     "COMMAND     PID USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME\n"
@@ -74,6 +74,21 @@ class ParseLsofIPv6Test(unittest.TestCase):
         # Zone ids (%en0) must never be stored on the IP.
         self.assertFalse(any("%" in ip for ip in ips))
         self.assertIn("2620:0:1::5", ips)
+
+
+class SplitEndpointTest(unittest.TestCase):
+    def test_ipv4_host_port(self):
+        self.assertEqual(_split_endpoint("1.2.3.4:443"), ("1.2.3.4", 443))
+
+    def test_bracketed_ipv6(self):
+        self.assertEqual(_split_endpoint("[2606:4700::1]:443"), ("2606:4700::1", 443))
+        self.assertEqual(_split_endpoint("[fe80::a%en0]:22"), ("fe80::a", 22))
+
+    def test_bare_ipv6_no_port_is_not_mangled(self):
+        # macOS lsof brackets IPv6 when a port is present, so a bare multi-colon
+        # token is an address with no port — must not be split on the last colon.
+        self.assertEqual(_split_endpoint("2620:0:1::5"), ("2620:0:1::5", None))
+        self.assertEqual(_split_endpoint("fe80::a%en0"), ("fe80::a", None))
 
 
 if __name__ == "__main__":

@@ -52,24 +52,31 @@ def _strip_zone(ip: str) -> str:
 
 
 def _split_endpoint(token: str) -> tuple[str, int | None]:
-    """'1.2.3.4:443', '[::1]:443', or 'fe80::1%en0:443' -> (ip, port)."""
+    """Parse an lsof endpoint into (ip, port).
+
+    macOS lsof brackets IPv6 when a port is present ('[2606:4700::1]:443');
+    IPv4 is 'host:port'. A bare, unbracketed IPv6 has multiple colons and no
+    port (lsof would have bracketed it otherwise), so it must NOT be split on
+    the last colon. IPv6 zone ids ('%en0') are stripped.
+    """
     if token.startswith("["):
         end = token.index("]")
-        ip = token[1:end]
+        ip = _strip_zone(token[1:end])
         rest = token[end + 1:]
         if rest.startswith(":"):
             try:
-                return _strip_zone(ip), int(rest[1:])
+                return ip, int(rest[1:])
             except ValueError:
-                return _strip_zone(ip), None
-        return _strip_zone(ip), None
-    if ":" in token:
+                return ip, None
+        return ip, None
+    # A single colon is host:port; multiple colons is a bare IPv6 address.
+    if token.count(":") == 1:
         ip, _, port = token.rpartition(":")
         try:
             return _strip_zone(ip), int(port)
         except ValueError:
             return _strip_zone(ip), None
-    return token, None
+    return _strip_zone(token), None
 
 
 def parse_lsof_connections(text: str) -> list[dict]:
