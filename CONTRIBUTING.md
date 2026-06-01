@@ -11,7 +11,7 @@ Thanks for your interest in improving AppBand.
 ## Development setup
 
 ```bash
-git clone https://github.com/evren/appband ~/Development/appband
+git clone https://github.com/evrenbilen/appband ~/Development/appband
 cd ~/Development/appband
 ./scripts/install.sh   # installs as LaunchAgents
 ```
@@ -44,6 +44,7 @@ No JS changes needed — the i18n module auto-loads any locale referenced by the
 ## Reporting bugs
 
 Use the [bug report template](.github/ISSUE_TEMPLATE/bug_report.md) and include:
+
 - macOS version
 - Commit SHA you're running
 - Relevant log excerpts from `~/Library/Logs/appband/`
