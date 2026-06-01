@@ -168,6 +168,10 @@ def build_handler(db_path: Path) -> type:
                     self._json({"rows": self._by_domain(conn, from_ts, to_ts, limit, scope)})
                 else:
                     self._error(404, "not found")
+            except (BrokenPipeError, ConnectionResetError):
+                # Client gone — let do_GET swallow it quietly; don't attempt a
+                # 500 write (which would fail again) or log a spurious error.
+                raise
             except Exception as e:  # noqa: BLE001
                 log.exception("handler error")
                 self._error(500, str(e))
