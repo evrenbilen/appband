@@ -113,6 +113,12 @@ def connect(db_path: Path) -> sqlite3.Connection:
         if conn.execute("PRAGMA quick_check").fetchone()[0] != "ok":
             raise sqlite3.DatabaseError("quick_check failed")
         init_schema(conn)
+    except sqlite3.OperationalError:
+        # Transient — e.g. "database is locked" (OperationalError subclasses
+        # DatabaseError). NOT corruption: let it propagate so launchd retries,
+        # rather than quarantining a healthy DB and losing data.
+        conn.close()
+        raise
     except sqlite3.DatabaseError as e:
         conn.close()
         _quarantine_corrupt_db(db_path, e)
