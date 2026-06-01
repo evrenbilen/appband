@@ -105,6 +105,15 @@ When the project graduates to a paid Apple Developer Program account, releases w
 - DB:   `~/Library/Application Support/appband/appband.db` (SQLite WAL)
 - Logs: `~/Library/Logs/appband/{collector,server}.log`
 
+## Troubleshooting
+
+- **First launch is blocked / "could not verify"** — expected (ad-hoc signed, not notarized). See [Gatekeeper bypass](#gatekeeper-bypass-first-launch-only).
+- **Menu bar shows `⚠ offline` / no data** — the background services aren't responding. Run `./scripts/status.sh` (or check `launchctl list | grep appband`); from the menu-bar popover, **Restart Services** kicks them. Confirm health at `http://127.0.0.1:8765/api/health`.
+- **Dashboard won't open at `http://127.0.0.1:8765/`** — make sure `dev.appband.server` is loaded (`./scripts/status.sh`), then check `~/Library/Logs/appband/server.log`. The dashboard is localhost-only and rejects non-loopback `Host`/`Origin` requests by design.
+- **A flat stretch in the time series** — if it shows a "collection gap" banner, the Mac was asleep / the collector was down then (not zero traffic).
+- **Per-app or per-domain numbers look off / don't sum to the total** — the by-domain and scoped by-app panels are **approximate** (see [Caveats](#caveats)); the LIVE per-app list and totals are exact.
+- **Start fresh** — `./scripts/uninstall.sh --purge` removes the services and the database; relaunching reinstalls.
+
 ## Tests
 
 ```bash
