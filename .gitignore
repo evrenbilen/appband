@@ -14,3 +14,7 @@ venv/
 *.code-workspace
 .idea/
 .vscode/
+
+# Internal development notes (not for public release)
+docs/internal/
+docs/superpowers/
