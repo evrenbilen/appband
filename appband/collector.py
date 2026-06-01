@@ -14,6 +14,7 @@ from typing import Callable
 
 from appband.config import Config, load_config
 from appband.db import (
+    close_orphan_sessions,
     connect,
     insert_connection,
     insert_interface_sample,
@@ -169,6 +170,7 @@ def main(config_path: Path | None = None) -> int:
     # Run schema migration once at startup with a short-lived connection.
     # Each worker thread will open its own connection lazily via _conn().
     bootstrap = connect(cfg.db_path)
+    close_orphan_sessions(bootstrap, int(time.time()))  # reconcile unclean shutdowns
     bootstrap.close()
 
     state = CollectorState(

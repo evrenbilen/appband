@@ -14,6 +14,7 @@ from appband.db import (
     query_timeseries,
     record_heartbeat,
     get_health,
+    close_orphan_sessions,
 )
 
 
@@ -62,6 +63,26 @@ class DbQueryTest(unittest.TestCase):
         upsert_dns(self.conn, ip="9.9.9.9", hostname=None, resolved_at=1500)
         self.assertIsNone(get_dns_hostname(self.conn, "9.9.9.9"))
         self.assertIsNone(get_dns_hostname(self.conn, "missing.ip"))
+
+    def test_close_orphan_sessions_keeps_only_most_recent(self):
+        # An unclean shutdown (SIGKILL) leaves sessions with ended_at IS NULL
+        # forever; purge_old only deletes ended sessions, so they (and their
+        # samples) leak past retention. Startup should close all but the most
+        # recent (which SessionWatcher re-adopts).
+        open_session(self.conn, 1000, "en0", "wifi", "A", None, "1.1.1.1")
+        open_session(self.conn, 2000, "en0", "wifi", "B", None, "1.1.1.2")
+        c = open_session(self.conn, 3000, "en0", "wifi", "C", None, "1.1.1.3")
+        close_orphan_sessions(self.conn, now=5000)
+        open_count = self.conn.execute(
+            "SELECT COUNT(*) FROM sessions WHERE ended_at IS NULL"
+        ).fetchone()[0]
+        self.assertEqual(open_count, 1)
+        self.assertEqual(get_active_session(self.conn)["id"], c)
+
+    def test_close_orphan_sessions_noop_when_one_open(self):
+        s = open_session(self.conn, 1000, "en0", "wifi", "A", None, "1.1.1.1")
+        close_orphan_sessions(self.conn, now=5000)
+        self.assertEqual(get_active_session(self.conn)["id"], s)  # still open
 
     def test_heartbeat_record_and_read(self):
         record_heartbeat(self.conn, "iface", 1000)

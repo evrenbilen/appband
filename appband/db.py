@@ -163,6 +163,21 @@ def close_session(conn: sqlite3.Connection, session_id: int, ended_at: int) -> N
     )
 
 
+def close_orphan_sessions(conn: sqlite3.Connection, now: int) -> None:
+    """Close every open session except the most recent. An unclean shutdown
+    (SIGKILL, crash) leaves sessions with ended_at IS NULL forever; purge_old
+    only deletes *ended* sessions, so those orphans and their samples leak past
+    retention. Run at startup; SessionWatcher re-adopts the most recent."""
+    conn.execute(
+        "UPDATE sessions SET ended_at = ? "
+        "WHERE ended_at IS NULL AND id NOT IN ("
+        "  SELECT id FROM sessions WHERE ended_at IS NULL "
+        "  ORDER BY started_at DESC LIMIT 1"
+        ")",
+        (now,),
+    )
+
+
 def get_active_session(conn: sqlite3.Connection) -> dict | None:
     cur = conn.execute(
         "SELECT id, started_at, ended_at, interface, link_type, ssid, bssid, ip_address "
