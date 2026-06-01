@@ -69,6 +69,27 @@ class CollectSnapshotTest(unittest.TestCase):
         with patch("appband.session_watcher._run", return_value=""):
             self.assertIsNone(collect_snapshot())
 
+    def test_collect_snapshot_wifi_happy_path(self):
+        # Exercise the full route -> ipconfig -> ifconfig -> classify wiring.
+        from appband.session_watcher import collect_snapshot
+
+        def fake_run(cmd):
+            if "route" in cmd[0]:
+                return "  interface: en0\n"
+            if "ipconfig" in cmd[0]:
+                return "  InterfaceType : WiFi\n  SSID : Office\n"
+            if "ifconfig" in cmd[0]:
+                return "\tinet 192.168.1.42 netmask 0xffffff00\n\tmedia: autoselect\n"
+            return ""
+
+        with patch("appband.session_watcher._run", side_effect=fake_run):
+            snap = collect_snapshot()
+        self.assertIsNotNone(snap)
+        self.assertEqual(snap.interface, "en0")
+        self.assertEqual(snap.link_type, "wifi")
+        self.assertEqual(snap.ssid, "Office")
+        self.assertEqual(snap.ip_address, "192.168.1.42")
+
 
 class RunToolTest(unittest.TestCase):
     def test_missing_tool_returns_empty_and_logs_error_once(self):
