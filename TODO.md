@@ -31,13 +31,13 @@ dashboard public CDN'e gidiyor. Yeni hiçbir hassas endpoint bu kapı inmeden ek
 - [x] `load_config` içinde `bind_host`'u loopback'e kıs (`ipaddress.is_loopback`); non-loopback → uyarı + `127.0.0.1`'e geri dön (S, high) (`appband/config.py`, `tests/test_config.py`)
 - [x] DB dosya izinlerini `0600` yap + at-rest şifrelemenin olmadığını dürüstçe belgele (S, med) (`appband/db.py`, README Privacy)
 
-### [ ] EPIC P0-B: Canlı "şu an" per-app döngüsü + dakika çözünürlüğü  ·  **ürünün manşeti**
+### [x] EPIC P0-B: Canlı "şu an" per-app döngüsü + dakika çözünürlüğü  ·  **TAMAMLANDI** (86 test geçiyor)
 Veri zaten tam (`scope=all` → `approximate:false`); backend sadece canlı/ince sunmuyor.
-- [ ] `/api/current`'a son ~60 sn'de **tam** ilk-N uygulamayı ekle (M, high) (`appband/server.py`)
-- [ ] `query_timeseries`'e `minute` (ham ~5–10 sn) granülaritesi ekle (M, high) (`appband/db.py`, `appband/server.py`)
-- [ ] Dashboard'a canlı ticker + ince çözünürlüklü throughput grafiği (M, high) (`appband/web/app.js`, `index.html`)
-- [ ] Popover'da `/api/by-process?scope=all` ile tam uygulama kırılımı (M, high) (`mac-app/Sources/AppBand/NetworkMonitor.swift`, `LivePopover.swift`)
-- [ ] **Kapsama göstergesi:** toplam (interface) vs atfedilen (process) farkını yüzde olarak göster — "%82 atfedildi" (M, high) (`appband/server.py`, `appband/web/app.js`)
+- [x] `/api/current`'a son ~60 sn'de **tam** ilk-N (5) uygulamayı ekle (M, high) (`appband/server.py`)
+- [x] `query_timeseries`'e `minute` (60 sn) granülaritesi ekle; dashboard kısa aralıkta (≤1 sa) kullanıyor (M, high) (`appband/db.py`, `appband/server.py`, `appband/web/app.js`)
+- [x] Dashboard LIVE paneline canlı top-apps listesi + kapsama chip'i; "Son saat" aralığında dakika-çözünürlüklü grafik (M, high) (`appband/web/app.js`, `index.html`, `style.css`, `locales/*.json`)
+- [x] Popover'da tam uygulama kırılımı — `/api/by-process?scope=all` yerine `/api/current.top_apps` kullanıldı (zaten 5 sn'de pollanıyor, canlı için daha doğru, hâlâ tam/exact) (M, high) (`mac-app/Sources/AppBand/NetworkMonitor.swift`, `LivePopover.swift`)
+- [x] **Kapsama göstergesi:** `/api/current.coverage` = toplam (interface) vs atfedilen (process) + yüzde; dashboard chip'inde "Ölçülenin %X'i atfedildi" (M, high) (`appband/server.py`, `appband/web/app.js`)
 
 ### [ ] EPIC P0-C: CI + sürüm tek-kaynak
 - [ ] GitHub Actions CI: macOS runner'da `unittest` + `swift build` (S, high) (`.github/workflows/ci.yml`)
