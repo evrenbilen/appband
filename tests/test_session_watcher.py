@@ -70,5 +70,21 @@ class CollectSnapshotTest(unittest.TestCase):
             self.assertIsNone(collect_snapshot())
 
 
+class RunToolTest(unittest.TestCase):
+    def test_missing_tool_returns_empty_and_logs_error_once(self):
+        # Consistent with collector._run: a missing route/ipconfig/ifconfig is
+        # reported once at ERROR, not flooded as per-tick WARNINGs.
+        from appband.session_watcher import _missing_tools, _run
+
+        _missing_tools.clear()
+        with patch("appband.session_watcher.subprocess.run", side_effect=FileNotFoundError("/sbin/route")):
+            with self.assertLogs("appband.session", level="ERROR") as cm:
+                self.assertEqual(_run(["/sbin/route"]), "")
+            self.assertTrue(any("not found" in m for m in cm.output))
+            with self.assertNoLogs("appband.session", level="ERROR"):
+                self.assertEqual(_run(["/sbin/route"]), "")
+        _missing_tools.clear()
+
+
 if __name__ == "__main__":
     unittest.main()

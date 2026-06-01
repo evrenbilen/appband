@@ -62,6 +62,8 @@ def _conn(state: CollectorState) -> sqlite3.Connection:
 
 
 # Tools reported missing (FileNotFoundError) — logged once each, not per tick.
+# Persists for the daemon's lifetime; a reinstalled tool isn't noticed until
+# restart (acceptable trade-off vs log spam).
 _missing_tools: set[str] = set()
 
 
@@ -288,7 +290,12 @@ def main(config_path: Path | None = None) -> int:
             # daily purges under the four writer threads.
             if now - last_checkpoint >= 3600:
                 try:
-                    wal_checkpoint(_conn(state))
+                    row = wal_checkpoint(_conn(state))
+                    # row = (busy, log_frames, checkpointed); busy != 0 means a
+                    # concurrent writer blocked the TRUNCATE and the WAL was not
+                    # truncated — surface it instead of silently growing.
+                    if row and row[0]:
+                        log.warning("wal checkpoint busy; WAL not truncated: %s", row)
                 except Exception:  # noqa: BLE001
                     log.exception("wal checkpoint failed")
                 last_checkpoint = now

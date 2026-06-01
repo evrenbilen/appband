@@ -28,12 +28,24 @@ class NetworkSnapshot:
         return (self.interface, self.link_type, self.ssid, self.bssid)
 
 
+# Tools reported missing (FileNotFoundError) — logged once each, not per tick.
+# Persists for the daemon's lifetime; a reinstalled tool isn't noticed until
+# restart (acceptable trade-off vs log spam). Mirrors collector._run.
+_missing_tools: set[str] = set()
+
+
 def _run(cmd: list[str]) -> str:
     try:
         out = subprocess.run(
             cmd, capture_output=True, text=True, timeout=5, check=False
         )
         return out.stdout
+    except FileNotFoundError:
+        tool = cmd[0]
+        if tool not in _missing_tools:
+            _missing_tools.add(tool)
+            log.error("required tool not found: %s — is it available on this macOS?", tool)
+        return ""
     except (subprocess.SubprocessError, OSError) as e:
         log.warning("subprocess failed: %s: %s", cmd, e)
         return ""
