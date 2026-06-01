@@ -25,7 +25,7 @@ from appband.delta import DeltaTracker
 from appband.dns_cache import DnsResolver
 from appband.parsers.lsof import parse_lsof_connections
 from appband.parsers.nettop import parse_nettop
-from appband.retention import purge_old, vacuum
+from appband.retention import purge_old, vacuum, wal_checkpoint
 from appband.session_watcher import SessionWatcher, collect_snapshot
 
 log = logging.getLogger("appband.collector")
@@ -264,10 +264,19 @@ def main(config_path: Path | None = None) -> int:
             stop.wait(0.5)
 
     def _retention_loop():
-        last_run = 0
+        last_purge = 0
+        last_checkpoint = 0
         while not stop.is_set():
             now = int(time.time())
-            if now - last_run >= 86400:
+            # Checkpoint the WAL hourly so it can't grow unbounded between the
+            # daily purges under the four writer threads.
+            if now - last_checkpoint >= 3600:
+                try:
+                    wal_checkpoint(_conn(state))
+                except Exception:  # noqa: BLE001
+                    log.exception("wal checkpoint failed")
+                last_checkpoint = now
+            if now - last_purge >= 86400:
                 try:
                     purge_old(
                         _conn(state),
@@ -278,7 +287,7 @@ def main(config_path: Path | None = None) -> int:
                     vacuum(_conn(state))
                 except Exception:  # noqa: BLE001
                     log.exception("retention tick failed")
-                last_run = now
+                last_purge = now
             stop.wait(60)
 
     threads = [

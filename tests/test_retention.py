@@ -1,7 +1,10 @@
 import sqlite3
+import tempfile
 import unittest
+from pathlib import Path
 
 from appband.db import (
+    connect,
     init_schema,
     open_session,
     close_session,
@@ -10,7 +13,7 @@ from appband.db import (
     insert_connection,
     upsert_dns,
 )
-from appband.retention import purge_old
+from appband.retention import purge_old, wal_checkpoint
 
 # Use a fixed reference timestamp that is well into the future relative to the
 # retention windows so the maths in purge_old produce positive cutoffs.
@@ -85,6 +88,21 @@ class RetentionTest(unittest.TestCase):
                 "SELECT hostname FROM dns_cache WHERE ip = '1.2.3.4'"
             ).fetchone()
         )
+
+
+class WalCheckpointTest(unittest.TestCase):
+    def test_wal_checkpoint_succeeds_on_wal_db(self):
+        # Between daily VACUUMs the WAL grows unbounded under the writer threads;
+        # a TRUNCATE checkpoint is the cheap maintenance that was missing.
+        with tempfile.TemporaryDirectory() as tmp:
+            conn = connect(Path(tmp) / "x.db")  # WAL mode
+            sid = open_session(conn, 0, "en0", "wifi", "O", None, "1.1.1.1")
+            for i in range(200):
+                insert_interface_sample(conn, ts=i, session_id=sid, bytes_in=1, bytes_out=1)
+            row = wal_checkpoint(conn)
+            conn.close()
+            # PRAGMA wal_checkpoint(TRUNCATE) -> (busy, log_frames, checkpointed)
+            self.assertEqual(row[0], 0)  # not busy -> checkpoint succeeded
 
 
 if __name__ == "__main__":

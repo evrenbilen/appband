@@ -38,3 +38,10 @@ def purge_old(
 
 def vacuum(conn: sqlite3.Connection) -> None:
     conn.execute("VACUUM")
+
+
+def wal_checkpoint(conn: sqlite3.Connection):
+    """Checkpoint the WAL into the main DB and truncate it. Cheap maintenance
+    the design lacked: between daily VACUUMs the WAL grew unbounded under the
+    four writer threads. Returns the PRAGMA row (busy, log, checkpointed)."""
+    return conn.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
