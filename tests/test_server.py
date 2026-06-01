@@ -318,6 +318,41 @@ class ServerTest(unittest.TestCase):
         self.assertGreaterEqual(len(office["timeseries"]), 1)
         self.assertEqual(guest["timeseries"], [])
 
+    def test_by_domain_splits_bytes_equally_across_hosts(self):
+        # Load-bearing approximation contract: a process's bytes are split
+        # equally across the distinct hosts it touched in the same 5-min bucket.
+        setup = sqlite3.connect(self.db_file)
+        init_schema(setup)
+        sid = setup.execute("SELECT id FROM sessions WHERE ended_at IS NULL LIMIT 1").fetchone()[0]
+        insert_process_sample(setup, ts=500, session_id=sid, process_name="P", pid=1, bytes_in=1000, bytes_out=200)
+        insert_connection(setup, ts=500, session_id=sid, process_name="P", remote_ip="1.1.1.1", remote_port=443, protocol="tcp", scope="internet")
+        insert_connection(setup, ts=500, session_id=sid, process_name="P", remote_ip="2.2.2.2", remote_port=443, protocol="tcp", scope="internet")
+        upsert_dns(setup, ip="1.1.1.1", hostname="a.com", resolved_at=500)
+        upsert_dns(setup, ip="2.2.2.2", hostname="b.com", resolved_at=500)
+        setup.commit()
+        setup.close()
+        _, body = self._get("/api/by-domain?from=0&to=10000&scope=internet")
+        by = {r["host"]: r for r in body["rows"]}
+        self.assertEqual(by["a.com"]["bytes_in"], 500)
+        self.assertEqual(by["b.com"]["bytes_in"], 500)
+        self.assertEqual(by["a.com"]["bytes_out"], 100)
+        self.assertEqual(by["b.com"]["bytes_out"], 100)
+
+    def test_by_process_distributes_by_scope_ratio(self):
+        # 1000 bytes; 1 internet + 1 lan connection in the bucket → the internet
+        # view gets 1000 * (1/2) = 500.
+        setup = sqlite3.connect(self.db_file)
+        init_schema(setup)
+        sid = setup.execute("SELECT id FROM sessions WHERE ended_at IS NULL LIMIT 1").fetchone()[0]
+        insert_process_sample(setup, ts=600, session_id=sid, process_name="Q", pid=2, bytes_in=1000, bytes_out=0)
+        insert_connection(setup, ts=600, session_id=sid, process_name="Q", remote_ip="8.8.8.8", remote_port=443, protocol="tcp", scope="internet")
+        insert_connection(setup, ts=600, session_id=sid, process_name="Q", remote_ip="192.168.1.1", remote_port=80, protocol="tcp", scope="lan")
+        setup.commit()
+        setup.close()
+        _, body = self._get("/api/by-process?from=0&to=10000&scope=internet")
+        q = next(r for r in body["rows"] if r["process_name"] == "Q")
+        self.assertEqual(q["bytes_in"], 500)
+
     def test_by_process_scope_all_returns_all(self):
         setup_conn = sqlite3.connect(self.db_file)
         init_schema(setup_conn)
