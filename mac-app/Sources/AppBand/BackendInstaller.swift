@@ -36,27 +36,41 @@ struct BackendInstaller {
         let backendCopied = fm.fileExists(atPath: targetDir.appendingPathComponent("appband/collector.py").path)
         let installedVersion = (try? String(contentsOf: versionMarker, encoding: .utf8))?
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let upToDate = installedVersion == bundledVersion
 
-        // Re-copy when the bundled version changes, so updating AppBand.app
-        // actually replaces the old backend (not just on first install).
-        if plistInstalled && backendCopied && upToDate { return }
+        if plistInstalled && backendCopied {
+            // Re-copy only when the bundled version changes, so an app update
+            // replaces the old backend. An empty bundled version means an
+            // un-built dev run — don't churn the existing install over it.
+            if bundledVersion.isEmpty || installedVersion == bundledVersion { return }
+        }
 
         // 1. Locate the backend bundled in the .app
         guard let resourceURL = Bundle.main.resourceURL else { throw InstallerError.resourcesMissing }
         let bundledBackend = resourceURL.appendingPathComponent("backend")
         guard fm.fileExists(atPath: bundledBackend.path) else { throw InstallerError.resourcesMissing }
 
-        // 2. Copy backend tree → ~/Library/Application Support/AppBand/backend/
-        try fm.createDirectory(at: targetDir.deletingLastPathComponent(), withIntermediateDirectories: true)
-        if fm.fileExists(atPath: targetDir.path) {
-            try fm.removeItem(at: targetDir)
-        }
-        try fm.copyItem(at: bundledBackend, to: targetDir)
+        let appDir = targetDir.deletingLastPathComponent()
+        try fm.createDirectory(at: appDir, withIntermediateDirectories: true)
 
-        // 3. Run scripts/install.sh
+        // 2. Stage the new backend alongside the old one. The live directory is
+        //    only touched once a complete copy exists, so a failed/interrupted
+        //    copy never leaves the running backend half-deleted.
+        let staging = appDir.appendingPathComponent("backend.new")
+        if fm.fileExists(atPath: staging.path) { try fm.removeItem(at: staging) }
+        try fm.copyItem(at: bundledBackend, to: staging)
+
+        // 3. Stop the agents BEFORE replacing their working directory. They have
+        //    KeepAlive=true and may hold open handles in the old backend, so
+        //    removing it underneath them would race. Best-effort (ignore
+        //    "not loaded"); install.sh re-bootstraps them in step 5.
+        if plistInstalled { bootoutAgents() }
+
+        // 4. Swap: drop the old tree, move the fully-staged copy into place.
+        if fm.fileExists(atPath: targetDir.path) { try fm.removeItem(at: targetDir) }
+        try fm.moveItem(at: staging, to: targetDir)
+
+        // 5. Make scripts executable + run install.sh (re-bootstraps the agents).
         let installScript = targetDir.appendingPathComponent("scripts/install.sh")
-        // Ensure executable
         try? fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: installScript.path)
         for binName in ["uninstall.sh", "status.sh", "vacuum.sh"] {
             let p = targetDir.appendingPathComponent("scripts/\(binName)").path
@@ -77,8 +91,20 @@ struct BackendInstaller {
             throw InstallerError.installFailed(out)
         }
 
-        // Record the installed version so the next launch only re-copies when
-        // the bundled version changes.
+        // 6. Record the installed version. Best-effort: a missing marker only
+        //    triggers another (now safe — staged + bootout) re-copy next launch.
         try? bundledVersion.write(to: versionMarker, atomically: true, encoding: .utf8)
+    }
+
+    /// Stop the background agents so their working directory can be replaced.
+    private static func bootoutAgents() {
+        let uid = getuid()
+        for label in ["dev.appband.collector", "dev.appband.server"] {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+            p.arguments = ["bootout", "gui/\(uid)/\(label)"]
+            try? p.run()
+            p.waitUntilExit()
+        }
     }
 }
