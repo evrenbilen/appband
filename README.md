@@ -1,6 +1,6 @@
 # AppBand
 
-**[Download AppBand 0.1.0 (DMG)](https://github.com/evrenbilen/appband/releases/latest)**  ·  macOS 13+  ·  ~500 KB
+**[Download AppBand 0.1.1 (DMG)](https://github.com/evrenbilen/appband/releases/latest)**  ·  macOS 13+  ·  ~500 KB
 
 **Per-App Bandwidth & Network Monitor for macOS**
 
@@ -22,13 +22,32 @@ AppBand is a local, privacy-respecting network usage monitor for macOS. It track
 
 ## Install
 
+### Download the DMG (easiest)
+
+1. Download **AppBand-0.1.1.dmg** from the [latest release](https://github.com/evrenbilen/appband/releases/latest).
+2. Open the DMG and drag **AppBand.app** to **Applications**.
+3. **First launch — Gatekeeper bypass.** AppBand is ad-hoc signed but not notarized (that requires a paid Apple Developer Program membership). On macOS 15+ Sequoia, double-clicking the first time shows *"Apple could not verify AppBand is free of malware"* with only **Move to Trash** / **Done** buttons. Use one of these to unblock it:
+
+   - **Terminal one-liner** (recommended — fastest):
+     ```bash
+     xattr -dr com.apple.quarantine /Applications/AppBand.app
+     ```
+     Now double-click `AppBand.app` — it opens normally.
+
+   - **System Settings** (no Terminal):
+     1. Try to open AppBand (it gets blocked).
+     2. Open **System Settings → Privacy & Security**.
+     3. Scroll down — you'll see *"AppBand was blocked..."*. Click **Open Anyway**.
+
+4. On launch, AppBand installs the background services into `~/Library/Application Support/AppBand/` and opens the dashboard at http://127.0.0.1:8765/. A small ↓/↑ Mbps indicator appears in your menu bar.
+
+### Install from source
+
 ```bash
-git clone https://github.com/<you>/appband ~/Development/appband
+git clone https://github.com/evrenbilen/appband ~/Development/appband
 cd ~/Development/appband
 ./scripts/install.sh
 ```
-
-The dashboard opens automatically at `http://127.0.0.1:8765/`.
 
 ## Status & uninstall
 

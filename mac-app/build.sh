@@ -39,10 +39,17 @@ cp -R "$REPO/scripts"   "$APP/Contents/Resources/backend/"
 find "$APP/Contents/Resources/backend" -name "__pycache__" -type d -exec rm -rf {} +
 find "$APP/Contents/Resources/backend" -name "*.pyc" -delete
 
-echo "=== 5. Ad-hoc code-sign ==="
+echo "=== 5. Copy app icon ==="
+if [ -f "$HERE/AppBand.icns" ]; then
+  cp "$HERE/AppBand.icns" "$APP/Contents/Resources/AppBand.icns"
+else
+  echo "warning: AppBand.icns missing; run 'swift scripts/make-icon.swift && iconutil --convert icns AppBand.iconset --output AppBand.icns' first" >&2
+fi
+
+echo "=== 6. Ad-hoc code-sign ==="
 codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict "$APP"
 
-echo "=== 6. Done ==="
+echo "=== 7. Done ==="
 echo "Built: $APP"
 du -sh "$APP" | awk '{print "Size:", $1}'
