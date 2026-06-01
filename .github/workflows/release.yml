@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, sign, DMG, checksum, publish
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run unittest suite
+        run: python3 -m unittest discover tests
+      - name: Build app + DMG
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd mac-app
+          ./build.sh
+          ./build-dmg.sh "$VERSION"
+      - name: Publish SHA-256 checksum
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd mac-app
+          shasum -a 256 "AppBand-$VERSION.dmg" | tee "AppBand-$VERSION.dmg.sha256"
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd mac-app
+          gh release create "$GITHUB_REF_NAME" \
+            "AppBand-$VERSION.dmg" "AppBand-$VERSION.dmg.sha256" \
+            --title "AppBand $VERSION" \
+            --generate-notes
