@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend tests (unittest)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run unittest suite
+        run: python3 -m unittest discover tests -v
+
+  swift:
+    name: Mac app builds
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Swift app
+        run: swift build
+        working-directory: mac-app
+
+  e2e:
+    name: Dashboard e2e (Playwright)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install e2e deps
+        run: npm install
+        working-directory: e2e
+      - name: Install Chromium
+        run: npx playwright install chromium
+        working-directory: e2e
+      - name: Run dashboard e2e tests
+        run: npm test
+        working-directory: e2e
