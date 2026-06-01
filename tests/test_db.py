@@ -54,5 +54,31 @@ class ConnectPermsTest(unittest.TestCase):
             self.assertEqual(oct(mode), oct(0o600))
 
 
+class CorruptDbTest(unittest.TestCase):
+    def test_corrupt_db_is_quarantined_and_recreated(self):
+        # A corrupt DB (power loss mid-WAL, disk full) must not crash-loop the
+        # KeepAlive collector. connect() should quarantine it and start fresh.
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "appband.db"
+            db_path.write_bytes(b"NOT a sqlite database " * 100)
+
+            conn = connect(db_path)  # must not raise
+            tables = {r[0] for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )}
+            conn.close()
+            self.assertIn("sessions", tables)  # fresh schema created
+
+            quarantined = list(Path(tmp).glob("appband.db.corrupt-*"))
+            self.assertEqual(len(quarantined), 1)
+
+    def test_healthy_db_is_not_quarantined(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "appband.db"
+            connect(db_path).close()      # create a healthy DB
+            connect(db_path).close()      # reopen — must not quarantine
+            self.assertEqual(list(Path(tmp).glob("appband.db.corrupt-*")), [])
+
+
 if __name__ == "__main__":
     unittest.main()

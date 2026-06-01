@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import os
 import sqlite3
+import time
 from pathlib import Path
 
 log = logging.getLogger("appband.db")
@@ -79,11 +80,39 @@ def init_schema(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _open(db_path: Path) -> sqlite3.Connection:
+    return sqlite3.connect(str(db_path), isolation_level=None, timeout=10.0, check_same_thread=False)
+
+
+def _quarantine_corrupt_db(db_path: Path, error: Exception) -> None:
+    """Rename a corrupt DB and its WAL/SHM sidecars aside so a fresh one can be
+    created — otherwise a corrupt file crash-loops the KeepAlive collector."""
+    ts = int(time.time())
+    for suffix in ("", "-wal", "-shm"):
+        p = Path(str(db_path) + suffix)
+        if p.exists():
+            try:
+                p.rename(Path(f"{db_path}.corrupt-{ts}{suffix}"))
+            except OSError:
+                pass
+    log.error("quarantined corrupt DB %s (%s); starting fresh", db_path, error)
+
+
 def connect(db_path: Path) -> sqlite3.Connection:
-    """Open a connection to the appband DB and ensure schema exists."""
+    """Open the appband DB, ensure schema, and self-heal a corrupt file."""
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path), isolation_level=None, timeout=10.0, check_same_thread=False)
-    init_schema(conn)
+    conn = _open(db_path)
+    try:
+        # quick_check is fast and raises/returns non-"ok" on a corrupt or
+        # non-SQLite file; either way we quarantine and recreate.
+        if conn.execute("PRAGMA quick_check").fetchone()[0] != "ok":
+            raise sqlite3.DatabaseError("quick_check failed")
+        init_schema(conn)
+    except sqlite3.DatabaseError as e:
+        conn.close()
+        _quarantine_corrupt_db(db_path, e)
+        conn = _open(db_path)
+        init_schema(conn)
     # The DB is a longitudinal record of network behavior — restrict it to the
     # owner so other local users can't read it at rest. (Not encrypted.)
     try:
