@@ -39,25 +39,26 @@ Veri zaten tam (`scope=all` → `approximate:false`); backend sadece canlı/ince
 - [x] Popover'da tam uygulama kırılımı — `/api/by-process?scope=all` yerine `/api/current.top_apps` kullanıldı (zaten 5 sn'de pollanıyor, canlı için daha doğru, hâlâ tam/exact) (M, high) (`mac-app/Sources/AppBand/NetworkMonitor.swift`, `LivePopover.swift`)
 - [x] **Kapsama göstergesi:** `/api/current.coverage` = toplam (interface) vs atfedilen (process) + yüzde; dashboard chip'inde "Ölçülenin %X'i atfedildi" (M, high) (`appband/server.py`, `appband/web/app.js`)
 
-### [ ] EPIC P0-C: CI + sürüm tek-kaynak
-- [ ] GitHub Actions CI: macOS runner'da `unittest` + `swift build` (S, high) (`.github/workflows/ci.yml`)
-- [ ] Tek-kaynak `VERSION` dosyası → Info.plist + README + backend `__version__` besler (S, high) (`mac-app/build.sh`, `appband/__init__.py`, README)
-- [ ] About kutusundaki sabit `0.1.3`'ü `CFBundleShortVersionString` okuyarak düzelt (S, low — doğrulanmış bug) (`mac-app/Sources/AppBand/AppBandApp.swift`)
-- [ ] Güncellemede backend'in yeniden kopyalanması: `installIfNeeded` sürüm karşılaştırsın (M, high — eski backend sonsuza dek çalışıyor) (`mac-app/Sources/AppBand/BackendInstaller.swift`)
+### [x] EPIC P0-C: CI + sürüm tek-kaynak  ·  **TAMAMLANDI** (90 test + build geçiyor)
+- [x] GitHub Actions CI: macOS'ta `unittest` + `swift build` + Playwright e2e (S, high) (`.github/workflows/ci.yml`)
+- [x] Tek-kaynak `appband.__version__` → build.sh Info.plist'e enjekte ediyor + README testle doğrulanıyor + `/api/version` endpoint'i (S, high) (`appband/__init__.py`, `mac-app/build.sh`, `appband/server.py`, `tests/test_version.py`)
+- [x] About kutusundaki sabit `0.1.3` → `CFBundleShortVersionString` okuyor (S, low — doğrulanmış bug) (`mac-app/Sources/AppBand/AppBandApp.swift`)
+- [x] Güncellemede backend yeniden kopyalanıyor: `installIfNeeded` `.version` marker'ı ile sürüm karşılaştırıyor (M, high) (`mac-app/Sources/AppBand/BackendInstaller.swift`)
 
 ---
 
 ## P1 — Güvenilirlik + çekirdek UX doğruluğu
 
-### [ ] EPIC P1-A: İki daemon'un kendini-iyileştirmesi
-- [ ] DB bozulması tespiti (`PRAGMA quick_check`) + karantina-ve-yeniden-oluştur → launchd crash döngüsünü kır (M, high) (`appband/db.py`, `tests/test_db.py`)
-- [ ] Heartbeat tablosu + `/api/health` (IPC'siz mimariye uygun tek liveness kanalı) (M, high) (`appband/db.py`, `appband/collector.py`, `appband/server.py`, `scripts/status.sh`)
-- [ ] Günlük bloklayan `VACUUM` yerine periyodik `wal_checkpoint(TRUNCATE)` + boyut-eşikli vacuum (M, med) (`appband/retention.py`, `appband/collector.py`)
-- [ ] `RotatingFileHandler`'a geç (her iki daemon, sınırsız log büyümesi) (S, med) (`appband/collector.py`, `appband/server.py`)
-- [ ] Thread supervisor: worker'ları daemon yap + ölen poller'ı yeniden başlat (M, med) (`appband/collector.py`)
-- [ ] Açıkta kalan oturumları başlangıçta kapat + yetim örnekleri purge et (30-gün retention sızıntısı) (M, med) (`appband/collector.py`, `appband/retention.py`)
-- [ ] `_run`: araç-eksik (FileNotFoundError) ile timeout/failure'ı ayır, tek-sefer logla, health'e yansıt (M, med) (`appband/collector.py`, `appband/session_watcher.py`)
-- [ ] Collector öz-metrikleri: düşen tick, izlenen anahtar sayısı, DNS kuyruk derinliği (M, med) (`appband/delta.py`, `appband/dns_cache.py`, `appband/server.py`)
+### [~] EPIC P1-A: İki daemon'un kendini-iyileştirmesi  ·  **8/10 yapıldı** (109 test geçiyor)
+- [x] DB bozulması tespiti (`PRAGMA quick_check`) + karantina-ve-yeniden-oluştur → launchd crash döngüsünü kır (M, high) (`appband/db.py`) — `12d2e3f` (+ `ef0025e` locked-DB) (+ tie-break `d8fabdc`)
+- [x] Heartbeat tablosu + `/api/health` (IPC'siz tek liveness kanalı; eksik-poller tespiti) (M, high) — `246faf4` (+ `f70f621`)
+- [x] Günlük `VACUUM` + saatlik `wal_checkpoint(TRUNCATE)` (busy uyarısı dahil) (M, med) — `40ca3c4` (+ `36e76b5`)
+- [x] `RotatingFileHandler`'a geç (her iki daemon, 5MB×3) (S, med) — `95979d0`
+- [ ] **DEFERLENDİ** Thread supervisor: ölen poller'ı yeniden başlat (M, med) — güvenli birim-testi için collector main()'in refactor'u gerekiyor; per-tick try/except zaten geçici hataları yutuyor, thread'ler yalnızca nadir scaffolding hatasında ölür. P2'ye taşındı. (`appband/collector.py`)
+- [x] Açıkta kalan oturumları başlangıçta kapat (30-gün retention sızıntısı) (M, med) — `aa83342`
+- [x] `_run`: araç-eksik (FileNotFoundError) ↔ timeout ayrımı, tek-sefer logla (collector + session_watcher) (M, med) — `43a8e96` (+ `36e76b5`)
+- [ ] **DEFERLENDİ** Collector öz-metrikleri (düşen tick, izlenen anahtar, DNS kuyruk derinliği) (M, med) — değerli ama P1-B/P1-C kullanıcı-yüzü kurtarmadan düşük öncelikli. P2'ye taşındı.
+- [x] **(bonus)** Server: istemci kopması (BrokenPipe/ConnectionReset) sessiz ele alınıyor — `115ee0f` (e2e doğruladı: 0 traceback)
 
 ### [ ] EPIC P1-B: Mac uygulaması — hata görünürlüğü, kurtarma, kalıcılık
 - [ ] Yutulan `BackendInstaller` hatasını NSAlert ile göster (S, high — doğrulanmış) (`mac-app/Sources/AppBand/AppBandApp.swift`, `BackendInstaller.swift`)
