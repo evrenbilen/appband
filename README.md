@@ -1,5 +1,7 @@
 # AppBand
 
+**[Download AppBand 0.1.0 (DMG)](https://github.com/evrenbilen/appband/releases/latest)**  ·  macOS 13+  ·  ~500 KB
+
 **Per-App Bandwidth & Network Monitor for macOS**
 
 AppBand is a local, privacy-respecting network usage monitor for macOS. It tracks which app on your machine talked to which destination, over which network, for how many bytes — and shows it on a local web dashboard.
