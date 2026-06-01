@@ -1,8 +1,22 @@
 # AppBand
 
-**[Download AppBand 0.1.3 (DMG)](https://github.com/evrenbilen/appband/releases/latest)**  ·  macOS 13+  ·  ~500 KB
-
 **Per-App Bandwidth & Network Monitor for macOS**
+
+**[⬇ Download AppBand 0.1.3 (DMG)](https://github.com/evrenbilen/appband/releases/latest)**  ·  macOS 13+  ·  ~500 KB
+
+## Screenshots
+
+### Dashboard
+
+![AppBand dashboard — LIVE panel, time series, by-domain and by-app breakdowns](docs/screenshots/dashboard.png)
+
+### Menu bar
+
+The menu bar item shows the current download / upload throughput inline; clicking opens a popover with the same LIVE panel you see in the dashboard.
+
+![AppBand menu bar — compact inline throughput](docs/screenshots/menubar.png)
+
+![AppBand menu bar popover — LIVE panel with stats, network chip, and actions](docs/screenshots/popover.png)
 
 AppBand is a local, privacy-respecting network usage monitor for macOS. It tracks which app on your machine talked to which destination, over which network, for how many bytes — and shows it on a local web dashboard.
 
@@ -26,19 +40,7 @@ AppBand is a local, privacy-respecting network usage monitor for macOS. It track
 
 1. Download **AppBand-0.1.3.dmg** from the [latest release](https://github.com/evrenbilen/appband/releases/latest).
 2. Open the DMG and drag **AppBand.app** to **Applications**.
-3. **First launch — Gatekeeper bypass.** AppBand is ad-hoc signed but not notarized (that requires a paid Apple Developer Program membership). On macOS 15+ Sequoia, double-clicking the first time shows *"Apple could not verify AppBand is free of malware"* with only **Move to Trash** / **Done** buttons. Use one of these to unblock it:
-
-   - **Terminal one-liner** (recommended — fastest):
-     ```bash
-     xattr -dr com.apple.quarantine /Applications/AppBand.app
-     ```
-     Now double-click `AppBand.app` — it opens normally.
-
-   - **System Settings** (no Terminal):
-     1. Try to open AppBand (it gets blocked).
-     2. Open **System Settings → Privacy & Security**.
-     3. Scroll down — you'll see *"AppBand was blocked..."*. Click **Open Anyway**.
-
+3. **First launch** — see the [Gatekeeper bypass](#gatekeeper-bypass-first-launch-only) section below to unblock the app on first open.
 4. On launch, AppBand installs the background services into `~/Library/Application Support/AppBand/` and opens the dashboard at http://127.0.0.1:8765/. A small ↓/↑ Mbps indicator appears in your menu bar.
 
 ### Install from source
@@ -48,6 +50,44 @@ git clone https://github.com/evrenbilen/appband ~/Development/appband
 cd ~/Development/appband
 ./scripts/install.sh
 ```
+
+## Gatekeeper bypass (first launch only)
+
+When you launch AppBand for the first time, macOS shows:
+
+> *"Apple could not verify 'AppBand' is free of malware that may harm your Mac or compromise your privacy."*
+
+with only **Move to Trash** / **Done** buttons. This is **expected** and **safe to bypass** — here is why, and how.
+
+### Why this happens
+
+AppBand is **ad-hoc signed** (a developer signature stamp is applied locally during build) but **not notarized** by Apple. Notarization requires a paid Apple Developer Program membership ($99 / year). Until that's set up, every AppBand release will trigger this warning on a clean Mac.
+
+Code that comes from the public AppBand repository (this one) is built reproducibly from sources you can inspect. The SHA-256 in each release matches what `shasum -a 256` produces on the downloaded DMG.
+
+### Bypass — Terminal one-liner (recommended)
+
+The fastest way: tell macOS to remove the "downloaded from the Internet" quarantine flag from the app.
+
+```bash
+xattr -dr com.apple.quarantine /Applications/AppBand.app
+```
+
+Double-click `AppBand.app` afterwards — it opens cleanly.
+
+### Bypass — System Settings (no Terminal)
+
+1. Double-click `AppBand.app`. The Gatekeeper warning appears.
+2. Click **Done** to dismiss it.
+3. Open **System Settings → Privacy & Security**.
+4. Scroll down — you'll see *"AppBand was blocked to protect your Mac"*.
+5. Click **Open Anyway**.
+6. Confirm with your password / Touch ID.
+7. Double-click `AppBand.app` again — it opens.
+
+### When will this go away
+
+When the project graduates to a paid Apple Developer Program account, releases will be notarized and the warning disappears. Until then, see [issue #1](https://github.com/evrenbilen/appband/issues) for status / discussion. If you want to help fund notarization, sponsoring the project is welcome — see the Sponsor button on the repo.
 
 ## Status & uninstall
 
