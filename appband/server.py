@@ -36,6 +36,14 @@ def _net_filter(qualifier: str, ssid: str | None, link_type: str | None):
     return ("", "", [])
 
 
+# Well-known remote ports → human label for the by-port breakdown.
+_PORT_SERVICES = {
+    443: "HTTPS", 80: "HTTP", 53: "DNS", 853: "DoT", 22: "SSH",
+    5223: "APNs", 5228: "GCM", 993: "IMAPS", 587: "SMTP", 465: "SMTPS",
+    123: "NTP", 3478: "STUN", 8080: "HTTP-alt", 8443: "HTTPS-alt",
+}
+
+
 def _is_loopback_name(name: str | None) -> bool:
     """True if a hostname refers to the local machine (127.0.0.0/8, ::1, localhost)."""
     if not name:
@@ -180,6 +188,9 @@ def build_handler(db_path: Path) -> type:
                     limit = _qint(qs, "limit", 50)
                     scope = qs.get("scope", ["internet"])[0]
                     self._json({"rows": self._by_domain(conn, from_ts, to_ts, limit, scope, ssid, link_type)})
+                elif path == "/api/by-port":
+                    limit = _qint(qs, "limit", 20)
+                    self._json({"rows": self._by_port(conn, from_ts, to_ts, limit, ssid, link_type)})
                 else:
                     self._error(404, "not found")
             except (BrokenPipeError, ConnectionResetError):
@@ -343,6 +354,26 @@ def build_handler(db_path: Path) -> type:
                 (from_ts, to_ts, *pnp, scope, from_ts, to_ts, *cnp, limit),
             )
             return [{"process_name": r[0], "bytes_in": r[1] or 0, "bytes_out": r[2] or 0, "approximate": True} for r in cur.fetchall()]
+
+        def _by_port(self, conn: sqlite3.Connection, from_ts: int, to_ts: int, limit: int, ssid: str | None = None, link_type: str | None = None) -> list[dict]:
+            # Connection-sighting counts per remote port (we have no per-connection
+            # bytes), labeled by well-known service. Exact counts, not bytes.
+            join, wsql, np = _net_filter("connections", ssid, link_type)
+            cur = conn.execute(
+                f"""
+                SELECT remote_port, COUNT(*) AS n
+                  FROM connections{join}
+                 WHERE ts >= ? AND ts < ?{wsql} AND remote_port IS NOT NULL
+                 GROUP BY remote_port
+                 ORDER BY n DESC
+                 LIMIT ?
+                """,
+                (from_ts, to_ts, *np, limit),
+            )
+            return [
+                {"port": r[0], "service": _PORT_SERVICES.get(r[0]), "count": r[1]}
+                for r in cur.fetchall()
+            ]
 
         def _by_domain(self, conn: sqlite3.Connection, from_ts: int, to_ts: int, limit: int, scope: str = "internet", ssid: str | None = None, link_type: str | None = None) -> list[dict]:
             # Distribute each (process, time-bucket) process_samples bytes

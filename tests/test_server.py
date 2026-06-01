@@ -353,6 +353,21 @@ class ServerTest(unittest.TestCase):
         q = next(r for r in body["rows"] if r["process_name"] == "Q")
         self.assertEqual(q["bytes_in"], 500)
 
+    def test_by_port_groups_and_labels(self):
+        setup = sqlite3.connect(self.db_file)
+        init_schema(setup)
+        sid = setup.execute("SELECT id FROM sessions WHERE ended_at IS NULL LIMIT 1").fetchone()[0]
+        for ip in ("1.1.1.1", "2.2.2.2"):
+            insert_connection(setup, ts=500, session_id=sid, process_name="P", remote_ip=ip, remote_port=443, protocol="tcp", scope="internet")
+        insert_connection(setup, ts=500, session_id=sid, process_name="P", remote_ip="8.8.8.8", remote_port=53, protocol="udp", scope="internet")
+        setup.commit()
+        setup.close()
+        _, body = self._get("/api/by-port?from=0&to=10000")
+        rows = {r["port"]: r for r in body["rows"]}
+        self.assertEqual(rows[443]["count"], 2)
+        self.assertEqual(rows[443]["service"], "HTTPS")
+        self.assertEqual(rows[53]["service"], "DNS")
+
     def test_by_process_scope_all_returns_all(self):
         setup_conn = sqlite3.connect(self.db_file)
         init_schema(setup_conn)
