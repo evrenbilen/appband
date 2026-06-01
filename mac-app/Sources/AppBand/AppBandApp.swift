@@ -141,8 +141,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let proc = Process()
         proc.executableURL = URL(fileURLWithPath: "/bin/bash")
         proc.arguments = purge ? [script.path, "--purge"] : [script.path]
-        try? proc.run()
-        proc.waitUntilExit()
-        NSApplication.shared.terminate(nil)
+        // Run off the main thread so the UI doesn't freeze while uninstall.sh
+        // boots out the agents; quit on the main thread once it completes.
+        DispatchQueue.global().async {
+            try? proc.run()
+            proc.waitUntilExit()
+            DispatchQueue.main.async { NSApplication.shared.terminate(nil) }
+        }
     }
 }

@@ -39,6 +39,11 @@ struct LivePopover: View {
         }
         .padding(14)
         .frame(width: 300)
+        .onAppear {
+            // Re-sync in case the login item was changed in System Settings
+            // while the popover was closed.
+            launchAtLogin = (SMAppService.mainApp.status == .enabled)
+        }
     }
 
     // ─── Subviews ───────────────────────────────────────────────────────────

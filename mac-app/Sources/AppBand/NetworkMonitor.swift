@@ -25,10 +25,10 @@ final class NetworkMonitor: ObservableObject {
     @Published var session: Session? = nil
     @Published var topApps: [TopApp] = []
     @Published var state: ConnState = .connecting
-    @Published var isOnline: Bool = false
 
     private var timer: Timer?
     private var failureCount = 0
+    private var isRestarting = false
 
     init() {
         Task { await refresh() }
@@ -55,7 +55,6 @@ final class NetworkMonitor: ObservableObject {
             self.menuBarTitle = String(format: "↓ %.1f ↑ %.1f", mIn, mOut)
             self.failureCount = 0
             self.state = .online
-            self.isOnline = true
 
             if let s = json["session"] as? [String: Any] {
                 self.session = Session(
@@ -84,7 +83,6 @@ final class NetworkMonitor: ObservableObject {
             self.menuBarTitle = self.state == .offline ? "⚠ offline" : "↓ … ↑ …"
             self.mbpsIn = 0
             self.mbpsOut = 0
-            self.isOnline = false
             self.session = nil
             self.topApps = []
         }
@@ -93,6 +91,8 @@ final class NetworkMonitor: ObservableObject {
     /// Restart the background LaunchAgents (recovery when the backend has died).
     /// kickstart -k re-runs an already-bootstrapped service.
     func restartServices() {
+        guard !isRestarting else { return }   // ignore rapid double-clicks
+        isRestarting = true
         let uid = getuid()
         for label in ["dev.appband.collector", "dev.appband.server"] {
             let p = Process()
@@ -102,6 +102,12 @@ final class NetworkMonitor: ObservableObject {
         }
         self.failureCount = 0
         self.state = .connecting
-        Task { await refresh() }
+        // Give the agents ~2s to bootstrap before polling, so a normal restart
+        // doesn't flicker CONNECTING -> OFFLINE before the backend is back up.
+        Task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            await refresh()
+            isRestarting = false
+        }
     }
 }
