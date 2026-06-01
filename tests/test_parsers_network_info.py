@@ -137,5 +137,24 @@ class ClassifyLinkTypeTest(unittest.TestCase):
             )
 
 
+class ParseNetworkInfoFixtureTest(unittest.TestCase):
+    def _fix(self, name):
+        from pathlib import Path
+        return (Path(__file__).parent / "fixtures" / name).read_text()
+
+    def test_route_default_fixture(self):
+        self.assertEqual(parse_default_interface(self._fix("route_default.txt")), "en0")
+
+    def test_ipconfig_summary_fixture(self):
+        r = parse_ipconfig_summary(self._fix("ipconfig_summary_en0.txt"))
+        self.assertEqual(r["ssid"], "sylwen 5GHZ")
+        self.assertEqual(r["interface_type"], "WiFi")
+
+    def test_ifconfig_fixture(self):
+        r = parse_ifconfig(self._fix("ifconfig_en0.txt"))
+        self.assertEqual(r["ip_address"], "192.168.0.116")
+        self.assertEqual(r["media"], "autoselect")
+
+
 if __name__ == "__main__":
     unittest.main()

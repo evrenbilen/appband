@@ -41,5 +41,22 @@ class ParseNettopTest(unittest.TestCase):
         self.assertEqual(rows[0]["pid"], 999)
 
 
+class ParseNettopFixtureTest(unittest.TestCase):
+    def test_real_capture_invariants(self):
+        from pathlib import Path
+
+        text = (Path(__file__).parent / "fixtures" / "nettop_sample.txt").read_text()
+        rows = parse_nettop(text)
+        self.assertGreater(len(rows), 0)
+        names = set()
+        for r in rows:
+            self.assertTrue(r["process_name"])           # no header/column row leaked
+            self.assertGreaterEqual(r["bytes_in"], 0)
+            self.assertGreaterEqual(r["bytes_out"], 0)
+            names.add(r["process_name"])
+        self.assertNotIn("", names)
+        self.assertNotIn("time", names)
+
+
 if __name__ == "__main__":
     unittest.main()
