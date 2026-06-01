@@ -30,6 +30,7 @@
   "panel.current.coverage": "Ölçülenin %{pct}'i atfedildi",
   "panel.current.coverage_help": "Uygulama toplamları arabirim toplamıyla nadiren eşleşir — çekirdek/sistem trafiği ve örnekleme boşlukları bir sürece atfedilmez.",
   "panel.timeseries.title": "Zaman Serisi",
+  "panel.timeseries.gaps_note": "Bu aralıkta {count} toplama boşluğu — o sırada trafik kaydedilmedi (uyku/uyanma veya toplayıcı kapalıydı).",
   "panel.by_network.title": "Ağa göre",
   "panel.by_process.title": "Uygulamaya göre",
   "panel.by_domain.title": "Domain'lere göre",

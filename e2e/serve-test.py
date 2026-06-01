@@ -14,6 +14,7 @@ from appband.db import (
     insert_interface_sample,
     insert_process_sample,
     open_session,
+    record_gap,
     upsert_dns,
 )
 from appband.server import NetmonServer, build_handler
@@ -50,6 +51,8 @@ upsert_dns(c, ip="142.250.1.1", hostname="google.com", resolved_at=now - 10)
 upsert_dns(c, ip="151.101.1.1", hostname="fastly.net", resolved_at=now - 10)
 # Traffic on the ended Ethernet session for the second doughnut slice.
 insert_interface_sample(c, ts=now - 3600, session_id=sid2, bytes_in=2_000_000, bytes_out=500_000)
+# A collection gap ~30 min ago (within the default "Today" range).
+record_gap(c, now - 1800, now - 1700)
 
 c.commit()
 c.close()

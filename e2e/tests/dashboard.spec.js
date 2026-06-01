@@ -85,4 +85,10 @@ test.describe("AppBand dashboard", () => {
     const title = await badge.getAttribute("title");
     expect((title || "").length).toBeGreaterThan(15); // the How-to-read explainer
   });
+
+  test("a collection gap is surfaced on the Time Series panel", async ({ page }) => {
+    // serve-test.py seeds a gap ~30 min ago, within the default Today range.
+    await page.goto("/");
+    await expect(page.locator("#panel-timeseries .gap-note")).toBeVisible({ timeout: 10_000 });
+  });
 });

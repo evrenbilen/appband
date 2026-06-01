@@ -392,6 +392,20 @@ async function loadTimeseries() {
         },
       }),
     });
+
+    // Surface collection gaps (sleep/wake) so a flat stretch reads as "we
+    // weren't watching", not "zero traffic".
+    try {
+      const gd = await fetchJson(`/api/gaps?from=${from}&to=${to}`);
+      if (gd.gaps && gd.gaps.length) {
+        const note = document.createElement("div");
+        note.className = "gap-note";
+        note.textContent = `⚠ ${t("panel.timeseries.gaps_note", { count: gd.gaps.length })}`;
+        $(containerId).prepend(note);
+      }
+    } catch (_) {
+      // Non-critical; the chart already rendered.
+    }
   } catch (err) {
     showError(containerId, loadTimeseries);
   }

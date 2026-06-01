@@ -30,6 +30,7 @@
   "panel.current.coverage": "Attributed {pct}% of measured",
   "panel.current.coverage_help": "Per-app totals rarely match the interface total — kernel/system traffic and sampling gaps aren't attributed to a process.",
   "panel.timeseries.title": "Time Series",
+  "panel.timeseries.gaps_note": "{count} collection gap(s) in this range — traffic wasn't recorded then (sleep/wake or the collector was down).",
   "panel.by_network.title": "By Network",
   "panel.by_process.title": "By App",
   "panel.by_domain.title": "By Domain",
