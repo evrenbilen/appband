@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from appband.parsers.lsof import _split_endpoint, parse_lsof_connections
 
@@ -89,6 +90,26 @@ class SplitEndpointTest(unittest.TestCase):
         # token is an address with no port — must not be split on the last colon.
         self.assertEqual(_split_endpoint("2620:0:1::5"), ("2620:0:1::5", None))
         self.assertEqual(_split_endpoint("fe80::a%en0"), ("fe80::a", None))
+
+
+class ParseLsofFixtureTest(unittest.TestCase):
+    def test_real_capture_invariants(self):
+        # The 30KB real macOS capture exercises quirks the inline samples don't.
+        text = (Path(__file__).parent / "fixtures" / "lsof_i.txt").read_text()
+        rows = parse_lsof_connections(text)
+        self.assertGreater(len(rows), 0)
+        for r in rows:
+            self.assertTrue(r["process_name"])
+            self.assertIsInstance(r["pid"], int)
+            self.assertIn(r["protocol"], ("tcp", "udp"))
+            self.assertIn(r["scope"], ("internet", "lan"))
+            # No excluded address survives, no zone/bracket leaks onto the IP.
+            self.assertNotIn("%", r["remote_ip"])
+            self.assertNotIn("[", r["remote_ip"])
+            self.assertNotEqual(r["remote_ip"], "::1")
+            self.assertFalse(r["remote_ip"].startswith(("127.", "169.254.", "fe80")))
+            if r["remote_port"] is not None:
+                self.assertTrue(0 < r["remote_port"] <= 65535)
 
 
 if __name__ == "__main__":
