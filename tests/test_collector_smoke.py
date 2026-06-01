@@ -54,27 +54,31 @@ class CollectorTickTest(unittest.TestCase):
         return result
 
     def test_interface_tick_records_delta(self):
-        with patch(
-            "netmon.collector.parse_netstat_ibn",
-            return_value={"en0": {"bytes_in": 1000, "bytes_out": 200}},
-        ), patch("netmon.collector._run", return_value=""):
+        sample1 = [
+            {"process_name": "dst1", "pid": 1, "bytes_in": 700, "bytes_out": 100},
+            {"process_name": "dst2", "pid": 2, "bytes_in": 300, "bytes_out": 100},
+        ]
+        sample2 = [
+            {"process_name": "dst1", "pid": 1, "bytes_in": 1100, "bytes_out": 200},
+            {"process_name": "dst2", "pid": 2, "bytes_in": 400, "bytes_out": 100},
+        ]
+        with patch("netmon.collector.parse_nettop", return_value=sample1), \
+             patch("netmon.collector._run", return_value="dummy"):
             run_interface_tick(self.state, now=1000)
             self.assertEqual(self._check("SELECT COUNT(*) FROM interface_samples")[0], 0)
 
-        with patch(
-            "netmon.collector.parse_netstat_ibn",
-            return_value={"en0": {"bytes_in": 1500, "bytes_out": 300}},
-        ), patch("netmon.collector._run", return_value=""):
+        with patch("netmon.collector.parse_nettop", return_value=sample2), \
+             patch("netmon.collector._run", return_value="dummy"):
             run_interface_tick(self.state, now=1005)
             row = self._check("SELECT bytes_in, bytes_out FROM interface_samples")
+            # sum1 = 1000/200, sum2 = 1500/300 → delta = 500/100
             self.assertEqual(row, (500, 100))
 
     def test_skips_when_no_active_session(self):
         self.state.active_session_id = None
-        with patch(
-            "netmon.collector.parse_netstat_ibn",
-            return_value={"en0": {"bytes_in": 1000, "bytes_out": 200}},
-        ), patch("netmon.collector._run", return_value=""):
+        sample = [{"process_name": "p", "pid": 1, "bytes_in": 1000, "bytes_out": 200}]
+        with patch("netmon.collector.parse_nettop", return_value=sample), \
+             patch("netmon.collector._run", return_value="dummy"):
             run_interface_tick(self.state, now=1000)
             run_interface_tick(self.state, now=1005)
             self.assertEqual(self._check("SELECT COUNT(*) FROM interface_samples")[0], 0)

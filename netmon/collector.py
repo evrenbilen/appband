@@ -22,7 +22,6 @@ from netmon.db import (
 from netmon.delta import DeltaTracker
 from netmon.dns_cache import DnsResolver
 from netmon.parsers.lsof import parse_lsof_connections
-from netmon.parsers.netstat import parse_netstat_ibn
 from netmon.parsers.nettop import parse_nettop
 from netmon.retention import purge_old, vacuum
 from netmon.session_watcher import SessionWatcher, collect_snapshot
@@ -71,14 +70,23 @@ def _run(cmd: list[str]) -> str:
 
 
 def run_interface_tick(state: CollectorState, now: int) -> None:
-    text = _run(["/usr/sbin/netstat", "-ibn"])
-    stats = parse_netstat_ibn(text)
-    iface = state.active_interface
-    if not iface or iface not in stats:
+    text = _run([
+        "/usr/bin/nettop", "-P", "-x", "-L", "1",
+        "-m", "route", "-t", "external",
+        "-J", "bytes_in,bytes_out",
+    ])
+    if not text:
         return
-    s = stats[iface]
-    delta_in = state.iface_tracker.update(iface + ":in", s["bytes_in"], now)
-    delta_out = state.iface_tracker.update(iface + ":out", s["bytes_out"], now)
+    rows = parse_nettop(text)
+    if not rows:
+        return
+    # Routes come and go; sum can decrease between polls. DeltaTracker handles
+    # this as a counter reset (returns None, re-anchors). Some ticks lost but
+    # never negative.
+    total_in = sum(r["bytes_in"] for r in rows)
+    total_out = sum(r["bytes_out"] for r in rows)
+    delta_in = state.iface_tracker.update("external:in", total_in, now)
+    delta_out = state.iface_tracker.update("external:out", total_out, now)
     if delta_in is None or delta_out is None:
         return
     if state.active_session_id is None:
