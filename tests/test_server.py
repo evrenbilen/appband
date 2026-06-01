@@ -208,6 +208,13 @@ class ServerTest(unittest.TestCase):
         self.assertIn("default-src 'none'", headers.get("Content-Security-Policy", ""))
         self.assertEqual(headers.get("X-Content-Type-Options"), "nosniff")
 
+    def test_api_version(self):
+        import appband
+        status, body = self._get("/api/version")
+        self.assertEqual(status, 200)
+        self.assertRegex(body["version"], r"^\d+\.\d+\.\d+$")
+        self.assertEqual(body["version"], appband.__version__)
+
     def test_chartjs_is_self_hosted(self):
         status, headers, body = self._raw_get("/static/vendor/chart.umd.min.js")
         self.assertEqual(status, 200)

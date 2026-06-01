@@ -10,6 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+from appband import __version__
 from appband.config import load_config
 
 log = logging.getLogger("appband.server")
@@ -118,6 +119,9 @@ def build_handler(db_path: Path) -> type:
                 return
             if path.startswith("/static/"):
                 self._static(path[len("/static/"):])
+                return
+            if path == "/api/version":
+                self._json({"version": __version__})
                 return
 
             now = int(time.time())
