@@ -138,6 +138,10 @@ Defense in depth for the local surface:
 - The dashboard is fully **self-contained**: it loads Chart.js from disk (`/static/vendor/`), so it makes **zero external requests** and works offline / behind captive portals. A strict Content-Security-Policy enforces this.
 - The database is created **owner-only (`0600`)**. Note it is **not encrypted at rest** — anyone who can read your home directory as your user can read it. Use FileVault for at-rest encryption.
 
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md).
+
 ## License
 
 MIT — see [LICENSE](./LICENSE).
