@@ -26,6 +26,24 @@ python3 -m unittest discover tests -v
 
 All tests use the stdlib `unittest` module — no `pytest`, no fixtures framework.
 
+### Frontend / e2e tests (`e2e/`)
+
+The web dashboard is exercised end-to-end with **Playwright (Node)**, run in a
+headless browser:
+
+```bash
+cd e2e
+npm install
+npx playwright install chromium   # one-time browser download
+npm test                          # launches the server on a seeded temp DB + runs specs
+```
+
+This is **dev-only test tooling and does not affect the backend's stdlib-only /
+no-`pip` constraint** — it is Node, lives entirely under `e2e/`, ships in
+nothing, and is never imported by `appband`. `e2e/serve-test.py` boots the real
+working-tree server against a freshly-seeded temp DB on port 8799, so e2e runs
+are deterministic and never touch your real DB or an installed instance.
+
 ## Code style
 
 - Python 3.10+ type hints where they help

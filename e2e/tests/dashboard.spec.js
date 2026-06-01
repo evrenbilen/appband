@@ -1,0 +1,67 @@
+// e2e coverage for the P0-B dashboard + the P0-A self-hosted/CSP posture.
+const { test, expect } = require("@playwright/test");
+
+test.describe("AppBand dashboard", () => {
+  test("loads with no JS errors and makes zero external requests", async ({ page }) => {
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(String(e)));
+    page.on("console", (m) => {
+      if (m.type() === "error") errors.push(m.text());
+    });
+    const external = [];
+    page.on("request", (r) => {
+      const host = new URL(r.url()).hostname;
+      if (host !== "127.0.0.1" && host !== "localhost") external.push(r.url());
+    });
+
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+
+    // Self-hosted Chart.js + strict CSP ⇒ nothing leaves localhost.
+    expect(external, "no external (CDN) requests").toEqual([]);
+    expect(errors, "no console/page errors").toEqual([]);
+  });
+
+  test("serves a strict CSP and nosniff header", async ({ request }) => {
+    const res = await request.get("/");
+    expect(res.status()).toBe(200);
+    const csp = res.headers()["content-security-policy"] || "";
+    expect(csp).toContain("default-src 'none'");
+    expect(csp).toContain("script-src 'self'");
+    expect(res.headers()["x-content-type-options"]).toBe("nosniff");
+  });
+
+  test("LIVE panel shows exact top apps, info tooltip, and coverage chip", async ({ page }) => {
+    await page.goto("/");
+    const rows = page.locator(".topapps-list .topapps-row");
+    await expect(rows.first()).toBeVisible({ timeout: 10_000 });
+    expect(await rows.count()).toBeGreaterThan(0);
+    // Safari is seeded as the heaviest app → ranks first.
+    await expect(rows.first()).toContainText("Safari");
+    // ⓘ tooltip clarifies that "now" means the last 60 seconds (EN or TR).
+    await expect(page.locator(".live-topapps-title .info-icon")).toHaveAttribute(
+      "title",
+      /60 seconds|60 saniye/
+    );
+    await expect(page.locator(".coverage-chip")).toContainText("%");
+  });
+
+  test("By Network is a compact doughnut beside the table (not a full-width square)", async ({ page }) => {
+    await page.goto("/");
+    const canvas = page.locator(".network-layout .network-chart canvas#chart-network");
+    await expect(canvas).toBeVisible({ timeout: 10_000 });
+    const box = await page.locator(".network-chart").boundingBox();
+    expect(box.height).toBeLessThan(320); // old bug rendered it ~700px tall
+    await expect(page.locator(".network-layout .data-table")).toBeVisible();
+  });
+
+  test('selecting "Last hour" requests minute granularity', async ({ page }) => {
+    await page.goto("/");
+    const req = page.waitForRequest(
+      (r) => r.url().includes("/api/timeseries") && r.url().includes("granularity=minute"),
+      { timeout: 10_000 }
+    );
+    await page.selectOption("#range", "3600");
+    await req; // throws if the minute-granularity request is never made
+  });
+});
