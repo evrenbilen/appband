@@ -23,6 +23,7 @@ class InitSchemaTest(unittest.TestCase):
         self.assertEqual(
             tables,
             [
+                "collector_health",
                 "connections",
                 "dns_cache",
                 "interface_samples",

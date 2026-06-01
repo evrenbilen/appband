@@ -62,6 +62,11 @@ CREATE TABLE IF NOT EXISTS dns_cache (
   hostname     TEXT,
   resolved_at  INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS collector_health (
+  poller       TEXT PRIMARY KEY,
+  last_ok_ts   INTEGER NOT NULL
+);
 """
 
 
@@ -222,6 +227,22 @@ def get_dns_hostname(conn: sqlite3.Connection, ip: str) -> str | None:
     if row is None:
         return None
     return row[0]
+
+
+def record_heartbeat(conn: sqlite3.Connection, poller: str, ts: int) -> None:
+    """Record a poller's last-successful-tick time (the collector's only
+    liveness signal — the two daemons share no IPC but this DB)."""
+    conn.execute(
+        "INSERT INTO collector_health (poller, last_ok_ts) VALUES (?, ?) "
+        "ON CONFLICT(poller) DO UPDATE SET last_ok_ts = excluded.last_ok_ts",
+        (poller, ts),
+    )
+
+
+def get_health(conn: sqlite3.Connection) -> dict:
+    """Return {poller: last_ok_ts} for all recorded pollers."""
+    cur = conn.execute("SELECT poller, last_ok_ts FROM collector_health")
+    return {r[0]: r[1] for r in cur.fetchall()}
 
 
 def query_timeseries(

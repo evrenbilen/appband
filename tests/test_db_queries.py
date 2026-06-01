@@ -12,6 +12,8 @@ from appband.db import (
     upsert_dns,
     get_dns_hostname,
     query_timeseries,
+    record_heartbeat,
+    get_health,
 )
 
 
@@ -60,6 +62,14 @@ class DbQueryTest(unittest.TestCase):
         upsert_dns(self.conn, ip="9.9.9.9", hostname=None, resolved_at=1500)
         self.assertIsNone(get_dns_hostname(self.conn, "9.9.9.9"))
         self.assertIsNone(get_dns_hostname(self.conn, "missing.ip"))
+
+    def test_heartbeat_record_and_read(self):
+        record_heartbeat(self.conn, "iface", 1000)
+        record_heartbeat(self.conn, "proc", 1010)
+        record_heartbeat(self.conn, "iface", 1020)  # upsert, not duplicate
+        health = get_health(self.conn)
+        self.assertEqual(health["iface"], 1020)
+        self.assertEqual(health["proc"], 1010)
 
     def test_timeseries_minute_aggregation(self):
         sid = open_session(self.conn, 0, "en0", "wifi", "Office", None, "192.168.1.42")

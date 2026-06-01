@@ -10,7 +10,7 @@ import urllib.error
 from contextlib import closing
 from pathlib import Path
 
-from appband.db import init_schema, open_session, insert_interface_sample, insert_process_sample, insert_connection
+from appband.db import init_schema, open_session, insert_interface_sample, insert_process_sample, insert_connection, record_heartbeat
 from appband.server import build_handler, NetmonServer
 
 
@@ -214,6 +214,31 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertRegex(body["version"], r"^\d+\.\d+\.\d+$")
         self.assertEqual(body["version"], appband.__version__)
+
+    def _seed_health(self, **pollers):
+        setup = sqlite3.connect(self.db_file)
+        init_schema(setup)
+        for poller, ts in pollers.items():
+            record_heartbeat(setup, poller, ts)
+        setup.commit()
+        setup.close()
+
+    def test_api_health_ok_when_recent(self):
+        now = int(time.time())
+        self._seed_health(session=now - 3, iface=now - 4, proc=now - 6, conn=now - 20)
+        status, body = self._get("/api/health")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["status"], "ok")
+        self.assertIn("iface", body["pollers"])
+
+    def test_api_health_degraded_when_stale(self):
+        self._seed_health(iface=int(time.time()) - 9999)
+        _, body = self._get("/api/health")
+        self.assertEqual(body["status"], "degraded")
+
+    def test_api_health_down_when_no_heartbeats(self):
+        _, body = self._get("/api/health")
+        self.assertEqual(body["status"], "down")
 
     def test_chartjs_is_self_hosted(self):
         status, headers, body = self._raw_get("/static/vendor/chart.umd.min.js")

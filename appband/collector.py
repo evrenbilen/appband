@@ -18,6 +18,7 @@ from appband.db import (
     insert_connection,
     insert_interface_sample,
     insert_process_sample,
+    record_heartbeat,
 )
 from appband.delta import DeltaTracker
 from appband.dns_cache import DnsResolver
@@ -233,6 +234,7 @@ def main(config_path: Path | None = None) -> int:
             if now - last_run >= interval:
                 try:
                     fn(state, now)
+                    record_heartbeat(_conn(state), name, now)  # liveness signal
                 except Exception:  # noqa: BLE001
                     log.exception("%s tick failed", name)
                 last_run = now
@@ -250,6 +252,7 @@ def main(config_path: Path | None = None) -> int:
                     sid = watcher.tick(snap, now)
                     state.active_session_id = sid
                     state.active_interface = snap.interface if snap else None
+                    record_heartbeat(_conn(state), "session", now)  # liveness signal
                 except Exception:  # noqa: BLE001
                     log.exception("session tick failed")
                 last_run = now

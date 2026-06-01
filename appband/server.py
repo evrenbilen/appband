@@ -133,6 +133,8 @@ def build_handler(db_path: Path) -> type:
                 conn.execute("PRAGMA journal_mode=WAL")
                 if path == "/api/current":
                     self._json(self._current(conn, now))
+                elif path == "/api/health":
+                    self._json(self._health(conn, now))
                 elif path == "/api/sessions":
                     self._json({"sessions": self._sessions(conn, from_ts, to_ts)})
                 elif path == "/api/timeseries":
@@ -156,6 +158,18 @@ def build_handler(db_path: Path) -> type:
                 self._error(500, str(e))
             finally:
                 conn.close()
+
+        def _health(self, conn: sqlite3.Connection, now: int) -> dict:
+            from appband.db import get_health
+            # Age (seconds) since each frequent poller last reported success.
+            pollers = {p: now - ts for p, ts in get_health(conn).items()}
+            if not pollers:
+                status = "down"          # collector never ran / dead
+            elif max(pollers.values()) > 120:
+                status = "degraded"      # a poller has gone stale
+            else:
+                status = "ok"
+            return {"status": status, "pollers": pollers}
 
         def _current(self, conn: sqlite3.Connection, now: int) -> dict:
             cur = conn.execute(
