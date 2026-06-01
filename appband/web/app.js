@@ -238,6 +238,24 @@ async function loadCurrent() {
     const ulMbps = fmtMbps(data.bytes_out_60s / 60);
     const networkLabel = s.ssid || `(${linkTypeLabel(s.link_type)})`;
 
+    // Exact "what is eating my bandwidth right now" — top apps over the last
+    // 60s (process_samples bytes are exact, so no approximation caveat) and a
+    // coverage chip explaining why per-app sums fall short of the total.
+    const cov = data.coverage;
+    const coverageChip = (cov && cov.pct != null)
+      ? `<span class="coverage-chip" title="${esc(t("panel.current.coverage_help"))}">${esc(t("panel.current.coverage", { pct: cov.pct }))}</span>`
+      : "";
+    const apps = Array.isArray(data.top_apps) ? data.top_apps : [];
+    const topAppsHtml = apps.length
+      ? `<ul class="topapps-list">
+          ${apps.map((a) => `
+            <li class="topapps-row">
+              <span class="topapps-name">${esc(a.process_name)}</span>
+              <span class="topapps-bytes">${esc(fmtBytes((a.bytes_in || 0) + (a.bytes_out || 0)))}</span>
+            </li>`).join("")}
+        </ul>`
+      : `<div class="topapps-empty">${esc(t("panel.current.no_app_traffic"))}</div>`;
+
     // Update badge in header
     const badge = $("live-network-badge");
     if (badge) {
@@ -263,7 +281,14 @@ async function loadCurrent() {
         ${s.ip_address ? `<span class="meta-chip"><span class="meta-icon">🌐</span>${esc(s.ip_address)}</span>` : ""}
         <span class="meta-chip">⏱ ${esc(fmtUptime(s.started_at))}</span>
       </div>
-      <div class="live-since">${esc(t("panel.current.started"))}: ${esc(fmtTime(s.started_at))}</div>`;
+      <div class="live-since">${esc(t("panel.current.started"))}: ${esc(fmtTime(s.started_at))}</div>
+      <div class="live-topapps">
+        <div class="live-topapps-header">
+          <span class="live-topapps-title">${esc(t("panel.current.top_apps"))}<span class="info-icon" title="${esc(t("panel.current.top_apps_help"))}">ⓘ</span></span>
+          ${coverageChip}
+        </div>
+        ${topAppsHtml}
+      </div>`;
   } catch (err) {
     showError("current-body", loadCurrent);
   }
@@ -297,7 +322,11 @@ async function loadTimeseries() {
   const containerId = "timeseries-body";
   try {
     const { from, to } = rangeBounds();
-    const granularity = state.range > 86400 * 2 ? "day" : "hour";
+    // Short ranges get fine-grained per-minute buckets so a live download/spike
+    // is actually visible; wide ranges stay on hour/day to bound the row count.
+    let granularity = "hour";
+    if (state.range > 86400 * 2) granularity = "day";
+    else if (state.range <= 3600) granularity = "minute";
     const data = await fetchJson(`/api/timeseries?from=${from}&to=${to}&granularity=${granularity}`);
 
     if (!data.timeseries || data.timeseries.length === 0) {
@@ -377,10 +406,42 @@ async function loadByNetwork() {
     const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     const cardBg = isDark ? "#1c1c1e" : "#ffffff";
 
-    ensureCanvas(containerId, "chart-network", undefined);
-
     const labels = data.rows.map((r) => r.ssid || `(${linkTypeLabel(r.link_type)})`);
     const totals = data.rows.map((r) => r.bytes_in + r.bytes_out);
+
+    // Lay the doughnut and the table side by side. A bare doughnut defaults to
+    // a square the full width of the card (absurdly tall); a fixed-size box +
+    // maintainAspectRatio:false keeps it compact and uses the freed space for
+    // the table.
+    if (state.charts["chart-network"]) {
+      state.charts["chart-network"].destroy();
+      delete state.charts["chart-network"];
+    }
+    const container = $(containerId);
+    if (!container) return;
+    container.innerHTML = `
+      <div class="network-layout">
+        <div class="network-chart"><canvas id="chart-network"></canvas></div>
+        <div class="network-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>${esc(t("table.network"))}</th>
+                <th class="num">${esc(t("table.download"))}</th>
+                <th class="num">${esc(t("table.upload"))}</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.rows.map((r) => `
+                <tr>
+                  <td>${esc(r.ssid || `(${linkTypeLabel(r.link_type)})`)}</td>
+                  <td class="num">${fmtBytes(r.bytes_in)}</td>
+                  <td class="num">${fmtBytes(r.bytes_out)}</td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
 
     makeOrUpdateChart("chart-network", {
       type: "doughnut",
@@ -396,6 +457,7 @@ async function loadByNetwork() {
       },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
         animation: { duration: 250 },
         cutout: "62%",
         plugins: {
@@ -423,32 +485,6 @@ async function loadByNetwork() {
         },
       },
     });
-
-    // Append table below chart
-    const container = $(containerId);
-    if (container) {
-      const wrap = document.createElement("div");
-      wrap.className = "network-table-wrap";
-      wrap.innerHTML = `
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>${esc(t("table.network"))}</th>
-              <th class="num">${esc(t("table.download"))}</th>
-              <th class="num">${esc(t("table.upload"))}</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${data.rows.map((r) => `
-              <tr>
-                <td>${esc(r.ssid || `(${linkTypeLabel(r.link_type)})`)}</td>
-                <td class="num">${fmtBytes(r.bytes_in)}</td>
-                <td class="num">${fmtBytes(r.bytes_out)}</td>
-              </tr>`).join("")}
-          </tbody>
-        </table>`;
-      container.appendChild(wrap);
-    }
   } catch (err) {
     showError(containerId, loadByNetwork);
   }

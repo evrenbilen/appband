@@ -416,6 +416,89 @@ body {
   color: var(--hint);
 }
 
+/* Live top apps (exact, last 60s) */
+.live-topapps {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.live-topapps-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.live-topapps-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.coverage-chip {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-chip);
+  padding: 2px 7px;
+  cursor: help;
+}
+
+.topapps-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.topapps-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--divider);
+}
+
+.topapps-row:last-child { border-bottom: none; }
+
+.topapps-name {
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topapps-bytes {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.topapps-empty {
+  font-size: 12px;
+  color: var(--hint);
+}
+
+.info-icon {
+  margin-left: 5px;
+  font-size: 11px;
+  color: var(--hint);
+  cursor: help;
+  vertical-align: baseline;
+}
+
+.info-icon:hover { color: var(--muted); }
+
 /* Offline / error state */
 .offline-state {
   display: flex;
@@ -606,6 +689,26 @@ body {
 /* ─── Network Table (inside card) ──────────────────────────────────────────── */
 .network-table-wrap {
   margin-top: 16px;
+}
+
+/* By Network: compact doughnut beside the table (not a full-width square) */
+.network-layout {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.network-chart {
+  position: relative;
+  width: 230px;
+  height: 230px;
+  flex-shrink: 0;
+}
+
+.network-layout .network-table-wrap {
+  margin-top: 0;
+  flex: 1 1 280px;
 }
 
 /* ─── Color Legend Chips ─────────────────────────────────────────────────────── */
