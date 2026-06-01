@@ -127,6 +127,15 @@ class ClassifyLinkTypeTest(unittest.TestCase):
             "iphone-hotspot",
         )
 
+    def test_vpn_when_tunnel_interface(self):
+        # A VPN's default route is a utun/ipsec/ppp device; it used to fall
+        # through to "ethernet", silently corrupting by-network grouping.
+        for iface in ("utun4", "ipsec0", "ppp0"):
+            self.assertEqual(
+                classify_link_type(interface=iface, ssid=None, media="", interface_type=None),
+                "vpn",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

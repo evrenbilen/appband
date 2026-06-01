@@ -229,6 +229,7 @@ struct LivePopover: View {
         case "ethernet":       return "cable.connector"
         case "iphone-hotspot": return "personalhotspot"
         case "usb-tether":     return "cable.connector.horizontal"
+        case "vpn":            return "lock.shield"
         default:               return "network"
         }
     }
@@ -240,6 +241,7 @@ struct LivePopover: View {
         case "ethernet":       return "Ethernet"
         case "iphone-hotspot": return "iPhone Hotspot"
         case "usb-tether":     return "USB Tether"
+        case "vpn":            return "VPN"
         default:               return s.linkType
         }
     }

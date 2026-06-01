@@ -75,6 +75,10 @@ def classify_link_type(
     interface_type: str | None = None,
 ) -> str:
     """Map (interface, ssid, media, interface_type) -> link_type tag."""
+    # A VPN/tunnel default route (utun/ipsec/ppp) takes precedence: traffic
+    # goes through the tunnel regardless of the underlying physical link.
+    if interface.startswith(("utun", "ipsec", "ppp")):
+        return "vpn"
     is_wifi = bool(interface_type and "wifi" in interface_type.lower())
     if is_wifi or ssid:
         if ssid:
