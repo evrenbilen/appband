@@ -92,6 +92,16 @@ def _open(db_path: Path) -> sqlite3.Connection:
     return sqlite3.connect(str(db_path), isolation_level=None, timeout=10.0, check_same_thread=False)
 
 
+def apply_perf_pragmas(conn: sqlite3.Connection) -> None:
+    """WAL-safe connection tuning for the read-heavy CTE queries and the
+    write-heavy collector — keeps the by-domain/by-process temp B-trees in
+    memory instead of spilling to disk, and speeds writes."""
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA temp_store=MEMORY")
+    conn.execute("PRAGMA cache_size=-8000")     # ~8 MiB page cache
+    conn.execute("PRAGMA mmap_size=268435456")  # 256 MiB memory-map
+
+
 def _quarantine_corrupt_db(db_path: Path, error: Exception) -> None:
     """Rename a corrupt DB and its WAL/SHM sidecars aside so a fresh one can be
     created — otherwise a corrupt file crash-loops the KeepAlive collector."""
@@ -134,6 +144,7 @@ def connect(db_path: Path) -> sqlite3.Connection:
         _quarantine_corrupt_db(db_path, e)
         conn = _open(db_path)
         init_schema(conn)
+    apply_perf_pragmas(conn)
     # The DB is a longitudinal record of network behavior — restrict it to the
     # owner so other local users can't read it at rest. (Not encrypted.)
     try:

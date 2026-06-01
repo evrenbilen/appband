@@ -15,6 +15,7 @@ from typing import Callable
 
 from appband.config import Config, load_config
 from appband.db import (
+    apply_perf_pragmas,
     close_orphan_sessions,
     connect,
     insert_connection,
@@ -57,6 +58,7 @@ def _conn(state: CollectorState) -> sqlite3.Connection:
         )
         c.execute("PRAGMA journal_mode=WAL")
         c.execute("PRAGMA foreign_keys=ON")
+        apply_perf_pragmas(c)
         _thread_local.conn = c
     return _thread_local.conn
 

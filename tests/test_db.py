@@ -56,6 +56,13 @@ class InitSchemaTest(unittest.TestCase):
 
 
 class ConnectPermsTest(unittest.TestCase):
+    def test_connect_applies_perf_pragmas(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            conn = connect(Path(tmp) / "appband.db")
+            self.assertEqual(conn.execute("PRAGMA temp_store").fetchone()[0], 2)  # MEMORY
+            self.assertEqual(conn.execute("PRAGMA cache_size").fetchone()[0], -8000)
+            conn.close()
+
     def test_db_file_is_owner_only(self):
         # The DB is a longitudinal record of network behavior; restrict it to
         # the owner (0600) so other local users can't read it at rest.

@@ -13,6 +13,7 @@ from urllib.parse import parse_qs, urlparse
 
 from appband import __version__
 from appband.config import load_config
+from appband.db import apply_perf_pragmas
 
 log = logging.getLogger("appband.server")
 WEB_ROOT = Path(__file__).parent / "web"
@@ -168,6 +169,7 @@ def build_handler(db_path: Path) -> type:
             conn = sqlite3.connect(str(db_path), timeout=10.0, check_same_thread=False)
             try:
                 conn.execute("PRAGMA journal_mode=WAL")
+                apply_perf_pragmas(conn)
                 if path == "/api/current":
                     self._json(self._current(conn, now))
                 elif path == "/api/health":
