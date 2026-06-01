@@ -64,4 +64,17 @@ test.describe("AppBand dashboard", () => {
     await page.selectOption("#range", "3600");
     await req; // throws if the minute-granularity request is never made
   });
+
+  test("selecting a network scopes the analytics requests", async ({ page }) => {
+    // The SSID filter was dead (state.ssid was never sent). Selecting TestNet
+    // (the seeded active Wi-Fi network) must now scope the API requests.
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    const req = page.waitForRequest(
+      (r) => r.url().includes("/api/by-process") && r.url().includes("ssid=TestNet"),
+      { timeout: 10_000 }
+    );
+    await page.selectOption("#ssid", "TestNet");
+    await req; // throws if the network-scoped request is never made
+  });
 });

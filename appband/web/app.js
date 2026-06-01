@@ -61,6 +61,7 @@ function linkTypeLabel(raw) {
 const state = {
   range: 86400,
   ssid: "",
+  linkType: "",   // set instead of ssid for SSID-less networks (e.g. Ethernet)
   scope: "internet",
   charts: {},
 };
@@ -75,6 +76,13 @@ async function fetchJson(path) {
 function rangeBounds() {
   const now = Math.floor(Date.now() / 1000);
   return { from: now - state.range, to: now };
+}
+
+/** Query suffix scoping a request to the selected network (or "" for all). */
+function netParam() {
+  if (state.ssid) return `&ssid=${encodeURIComponent(state.ssid)}`;
+  if (state.linkType) return `&link_type=${encodeURIComponent(state.linkType)}`;
+  return "";
 }
 
 /* ─── Chart.js shared config ─────────────────────────────────────────────── */
@@ -304,10 +312,12 @@ async function loadSsidOptions() {
     const current = sel.value;
     while (sel.options.length > 1) sel.remove(1);
     for (const row of data.rows) {
-      const v = row.ssid || `(${linkTypeLabel(row.link_type)})`;
+      const label = row.ssid || `(${linkTypeLabel(row.link_type)})`;
       const opt = document.createElement("option");
-      opt.value = v;
-      opt.textContent = v;
+      // Encode so the change handler can tell a real SSID from a link-type
+      // network (the server filters by ssid OR link_type accordingly).
+      opt.value = row.ssid ? row.ssid : `lt:${row.link_type}`;
+      opt.textContent = label;
       sel.appendChild(opt);
     }
     // Restore selection if still available
@@ -327,7 +337,7 @@ async function loadTimeseries() {
     let granularity = "hour";
     if (state.range > 86400 * 2) granularity = "day";
     else if (state.range <= 3600) granularity = "minute";
-    const data = await fetchJson(`/api/timeseries?from=${from}&to=${to}&granularity=${granularity}`);
+    const data = await fetchJson(`/api/timeseries?from=${from}&to=${to}&granularity=${granularity}${netParam()}`);
 
     if (!data.timeseries || data.timeseries.length === 0) {
       showEmpty(containerId);
@@ -495,7 +505,7 @@ async function loadByProcess() {
   const containerId = "process-body";
   try {
     const { from, to } = rangeBounds();
-    const data = await fetchJson(`/api/by-process?from=${from}&to=${to}&limit=15&scope=${state.scope}`);
+    const data = await fetchJson(`/api/by-process?from=${from}&to=${to}&limit=15&scope=${state.scope}${netParam()}`);
 
     if (!data.rows || data.rows.length === 0) {
       showEmpty(containerId);
@@ -558,7 +568,7 @@ async function loadByDomain() {
   const containerId = "domain-body";
   try {
     const { from, to } = rangeBounds();
-    const data = await fetchJson(`/api/by-domain?from=${from}&to=${to}&limit=15&scope=${state.scope}`);
+    const data = await fetchJson(`/api/by-domain?from=${from}&to=${to}&limit=15&scope=${state.scope}${netParam()}`);
 
     if (!data.rows || data.rows.length === 0) {
       showEmpty(containerId);
@@ -694,7 +704,14 @@ function bind() {
     refreshAll();
   });
   $("ssid").addEventListener("change", (e) => {
-    state.ssid = e.target.value;
+    const v = e.target.value;
+    if (v.startsWith("lt:")) {
+      state.ssid = "";
+      state.linkType = v.slice(3);
+    } else {
+      state.ssid = v;
+      state.linkType = "";
+    }
     refreshAll();
   });
   $("scope").addEventListener("change", (e) => {
