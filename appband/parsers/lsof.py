@@ -45,24 +45,30 @@ def _is_excluded(ip: str) -> bool:
     return False
 
 
+def _strip_zone(ip: str) -> str:
+    """Drop an IPv6 zone id ('fe80::1%en0' -> 'fe80::1') so the bare address is
+    what gets stored, classified, and reverse-resolved."""
+    return ip.split("%", 1)[0]
+
+
 def _split_endpoint(token: str) -> tuple[str, int | None]:
-    """'1.2.3.4:443' or '[::1]:443' -> (ip, port)."""
+    """'1.2.3.4:443', '[::1]:443', or 'fe80::1%en0:443' -> (ip, port)."""
     if token.startswith("["):
         end = token.index("]")
         ip = token[1:end]
         rest = token[end + 1:]
         if rest.startswith(":"):
             try:
-                return ip, int(rest[1:])
+                return _strip_zone(ip), int(rest[1:])
             except ValueError:
-                return ip, None
-        return ip, None
+                return _strip_zone(ip), None
+        return _strip_zone(ip), None
     if ":" in token:
         ip, _, port = token.rpartition(":")
         try:
-            return ip, int(port)
+            return _strip_zone(ip), int(port)
         except ValueError:
-            return ip, None
+            return _strip_zone(ip), None
     return token, None
 
 

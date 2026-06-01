@@ -50,5 +50,31 @@ class ParseLsofTest(unittest.TestCase):
         self.assertEqual(local2["scope"], "lan")
 
 
+SAMPLE_V6 = (
+    "COMMAND     PID USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME\n"
+    "Safari      501 evren   30u IPv6 0x1               0t0  TCP [2606:4700::1]:5000->[2607:f8b0::200e]:443 (ESTABLISHED)\n"
+    "vpnd         88 evren    9u IPv6 0x2               0t0  TCP [fd00::1]:5000->[fd12:3456::99]:443 (ESTABLISHED)\n"
+    "Mail         90 evren    4u IPv6 0x3               0t0  TCP [::1]:5000->[::1]:993 (ESTABLISHED)\n"
+    "Web          99 evren    5u IPv6 0x4               0t0  TCP [fe80::a%en0]:5000->[2620:0:1::5%en0]:443 (ESTABLISHED)\n"
+)
+
+
+class ParseLsofIPv6Test(unittest.TestCase):
+    def test_ipv6_endpoints_port_scope_and_zone_strip(self):
+        rows = parse_lsof_connections(SAMPLE_V6)
+        ips = {r["remote_ip"]: r for r in rows}
+        # Global IPv6 kept with correct port + scope.
+        self.assertIn("2607:f8b0::200e", ips)
+        self.assertEqual(ips["2607:f8b0::200e"]["remote_port"], 443)
+        self.assertEqual(ips["2607:f8b0::200e"]["scope"], "internet")
+        # Unique-local (fd00::/8) is LAN.
+        self.assertEqual(ips["fd12:3456::99"]["scope"], "lan")
+        # Loopback dropped.
+        self.assertNotIn("::1", ips)
+        # Zone ids (%en0) must never be stored on the IP.
+        self.assertFalse(any("%" in ip for ip in ips))
+        self.assertIn("2620:0:1::5", ips)
+
+
 if __name__ == "__main__":
     unittest.main()
