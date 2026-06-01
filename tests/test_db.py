@@ -36,6 +36,16 @@ class InitSchemaTest(unittest.TestCase):
         init_schema(self.conn)
         init_schema(self.conn)  # second call must not raise
 
+    def test_session_id_indexes_exist(self):
+        # Needed so the per-network (SSID) filter joins on session_id without a
+        # full scan of the two largest tables.
+        init_schema(self.conn)
+        idx = {r[0] for r in self.conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='index'"
+        )}
+        self.assertIn("idx_proc_session", idx)
+        self.assertIn("idx_conn_session", idx)
+
     def test_wal_mode_enabled(self):
         init_schema(self.conn)
         mode = self.conn.execute("PRAGMA journal_mode").fetchone()[0]

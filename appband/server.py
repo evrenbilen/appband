@@ -24,6 +24,18 @@ EXPECTED_POLLERS = ("session", "iface", "proc", "conn")
 HEARTBEAT_STALE_SEC = 120
 
 
+def _net_filter(qualifier: str, ssid: str | None, link_type: str | None):
+    """Return (join, where, params) that scope rows of `qualifier` (a table name
+    or alias with a session_id column) to one network. `ssid` wins; `link_type`
+    matches the SSID-less networks the dashboard labels like "(Ethernet)"."""
+    if ssid:
+        return (f" JOIN sessions s ON s.id = {qualifier}.session_id", " AND s.ssid = ?", [ssid])
+    if link_type:
+        return (f" JOIN sessions s ON s.id = {qualifier}.session_id",
+                " AND s.link_type = ? AND s.ssid IS NULL", [link_type])
+    return ("", "", [])
+
+
 def _is_loopback_name(name: str | None) -> bool:
     """True if a hostname refers to the local machine (127.0.0.0/8, ::1, localhost)."""
     if not name:
@@ -142,6 +154,8 @@ def build_handler(db_path: Path) -> type:
             now = int(time.time())
             from_ts = _qint(qs, "from", now - 86400)
             to_ts = _qint(qs, "to", now)
+            ssid = qs.get("ssid", [None])[0] or None
+            link_type = qs.get("link_type", [None])[0] or None
 
             conn = sqlite3.connect(str(db_path), timeout=10.0, check_same_thread=False)
             try:
@@ -155,17 +169,17 @@ def build_handler(db_path: Path) -> type:
                 elif path == "/api/timeseries":
                     from appband.db import query_timeseries
                     gran = qs.get("granularity", ["hour"])[0]
-                    self._json({"timeseries": query_timeseries(conn, from_ts, to_ts, gran)})
+                    self._json({"timeseries": query_timeseries(conn, from_ts, to_ts, gran, ssid, link_type)})
                 elif path == "/api/by-network":
                     self._json({"rows": self._by_network(conn, from_ts, to_ts)})
                 elif path == "/api/by-process":
                     limit = _qint(qs, "limit", 20)
                     scope = qs.get("scope", ["internet"])[0]
-                    self._json({"rows": self._by_process(conn, from_ts, to_ts, limit, scope)})
+                    self._json({"rows": self._by_process(conn, from_ts, to_ts, limit, scope, ssid, link_type)})
                 elif path == "/api/by-domain":
                     limit = _qint(qs, "limit", 50)
                     scope = qs.get("scope", ["internet"])[0]
-                    self._json({"rows": self._by_domain(conn, from_ts, to_ts, limit, scope)})
+                    self._json({"rows": self._by_domain(conn, from_ts, to_ts, limit, scope, ssid, link_type)})
                 else:
                     self._error(404, "not found")
             except (BrokenPipeError, ConnectionResetError):
@@ -276,18 +290,20 @@ def build_handler(db_path: Path) -> type:
                 for r in cur.fetchall()
             ]
 
-        def _by_process(self, conn: sqlite3.Connection, from_ts: int, to_ts: int, limit: int, scope: str = "internet") -> list[dict]:
+        def _by_process(self, conn: sqlite3.Connection, from_ts: int, to_ts: int, limit: int, scope: str = "internet", ssid: str | None = None, link_type: str | None = None) -> list[dict]:
+            pjoin, pwsql, pnp = _net_filter("process_samples", ssid, link_type)
+            cjoin, cwsql, cnp = _net_filter("connections", ssid, link_type)
             if scope == "all":
                 cur = conn.execute(
-                    """
+                    f"""
                     SELECT process_name, SUM(bytes_in), SUM(bytes_out)
-                      FROM process_samples
-                     WHERE ts >= ? AND ts < ?
+                      FROM process_samples{pjoin}
+                     WHERE ts >= ? AND ts < ?{pwsql}
                      GROUP BY process_name
                      ORDER BY SUM(bytes_in) + SUM(bytes_out) DESC
                      LIMIT ?
                     """,
-                    (from_ts, to_ts, limit),
+                    (from_ts, to_ts, *pnp, limit),
                 )
                 return [{"process_name": r[0], "bytes_in": r[1] or 0, "bytes_out": r[2] or 0, "approximate": False} for r in cur.fetchall()]
 
@@ -297,16 +313,16 @@ def build_handler(db_path: Path) -> type:
                 WITH proc_buckets AS (
                   SELECT process_name, (ts / {BUCKET}) * {BUCKET} AS bucket,
                          SUM(bytes_in) AS bin, SUM(bytes_out) AS bout
-                    FROM process_samples
-                   WHERE ts >= ? AND ts < ?
+                    FROM process_samples{pjoin}
+                   WHERE ts >= ? AND ts < ?{pwsql}
                    GROUP BY process_name, bucket
                 ),
                 conn_buckets AS (
                   SELECT process_name, (ts / {BUCKET}) * {BUCKET} AS bucket,
                          SUM(CASE WHEN scope = ? THEN 1 ELSE 0 END) AS matching,
                          SUM(CASE WHEN scope IS NOT NULL THEN 1 ELSE 0 END) AS total
-                    FROM connections
-                   WHERE ts >= ? AND ts < ?
+                    FROM connections{cjoin}
+                   WHERE ts >= ? AND ts < ?{cwsql}
                    GROUP BY process_name, bucket
                 ),
                 shares AS (
@@ -324,11 +340,11 @@ def build_handler(db_path: Path) -> type:
                  ORDER BY bytes_in + bytes_out DESC
                  LIMIT ?
                 """,
-                (from_ts, to_ts, scope, from_ts, to_ts, limit),
+                (from_ts, to_ts, *pnp, scope, from_ts, to_ts, *cnp, limit),
             )
             return [{"process_name": r[0], "bytes_in": r[1] or 0, "bytes_out": r[2] or 0, "approximate": True} for r in cur.fetchall()]
 
-        def _by_domain(self, conn: sqlite3.Connection, from_ts: int, to_ts: int, limit: int, scope: str = "internet") -> list[dict]:
+        def _by_domain(self, conn: sqlite3.Connection, from_ts: int, to_ts: int, limit: int, scope: str = "internet", ssid: str | None = None, link_type: str | None = None) -> list[dict]:
             # Distribute each (process, time-bucket) process_samples bytes
             # equally across the distinct remote hostnames the process touched
             # in that bucket. Buckets are 5-minute windows.
@@ -339,6 +355,8 @@ def build_handler(db_path: Path) -> type:
             else:
                 scope_clause = " AND c.scope = ?"
                 scope_params = (scope,)
+            pjoin, pwsql, pnp = _net_filter("process_samples", ssid, link_type)
+            cjoin, cwsql, cnp = _net_filter("c", ssid, link_type)
             cur = conn.execute(
                 f"""
                 WITH proc_buckets AS (
@@ -346,17 +364,17 @@ def build_handler(db_path: Path) -> type:
                          (ts / {BUCKET}) * {BUCKET} AS bucket,
                          SUM(bytes_in)  AS bin,
                          SUM(bytes_out) AS bout
-                    FROM process_samples
-                   WHERE ts >= ? AND ts < ?
+                    FROM process_samples{pjoin}
+                   WHERE ts >= ? AND ts < ?{pwsql}
                    GROUP BY process_name, bucket
                 ),
                 conn_buckets AS (
                   SELECT c.process_name,
                          (c.ts / {BUCKET}) * {BUCKET} AS bucket,
                          COALESCE(d.hostname, c.remote_ip) AS host
-                    FROM connections c
+                    FROM connections c{cjoin}
                LEFT JOIN dns_cache d ON d.ip = c.remote_ip
-                   WHERE c.ts >= ? AND c.ts < ?{scope_clause}
+                   WHERE c.ts >= ? AND c.ts < ?{scope_clause}{cwsql}
                    GROUP BY c.process_name, bucket, host
                 ),
                 counts AS (
@@ -374,7 +392,7 @@ def build_handler(db_path: Path) -> type:
                  ORDER BY bytes_in + bytes_out DESC
                  LIMIT ?
                 """,
-                (from_ts, to_ts, from_ts, to_ts, *scope_params, limit),
+                (from_ts, to_ts, *pnp, from_ts, to_ts, *scope_params, *cnp, limit),
             )
             return [
                 {"host": r[0], "bytes_in": int(r[1] or 0), "bytes_out": int(r[2] or 0), "approximate": True}

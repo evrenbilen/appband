@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS process_samples (
 );
 CREATE INDEX IF NOT EXISTS idx_proc_ts ON process_samples(ts);
 CREATE INDEX IF NOT EXISTS idx_proc_name_ts ON process_samples(process_name, ts);
+CREATE INDEX IF NOT EXISTS idx_proc_session ON process_samples(session_id);
 
 CREATE TABLE IF NOT EXISTS connections (
   id            INTEGER PRIMARY KEY,
@@ -56,6 +57,7 @@ CREATE TABLE IF NOT EXISTS connections (
 );
 CREATE INDEX IF NOT EXISTS idx_conn_ts ON connections(ts);
 CREATE INDEX IF NOT EXISTS idx_conn_ip ON connections(remote_ip);
+CREATE INDEX IF NOT EXISTS idx_conn_session ON connections(session_id);
 
 CREATE TABLE IF NOT EXISTS dns_cache (
   ip           TEXT PRIMARY KEY,
@@ -278,20 +280,33 @@ def query_timeseries(
     from_ts: int,
     to_ts: int,
     granularity: str = "hour",
+    ssid: str | None = None,
+    link_type: str | None = None,
 ) -> list[dict]:
-    """Aggregate interface_samples into time buckets (minute / hour / day)."""
+    """Aggregate interface_samples into time buckets (minute / hour / day),
+    optionally scoped to one network: by SSID, or by link_type for the
+    SSID-less networks the dashboard labels like "(Ethernet)"."""
     bucket = {"minute": 60, "hour": 3600, "day": 86400}.get(granularity, 3600)
+    where = "WHERE i.ts >= ? AND i.ts < ?"
+    params: list = [from_ts, to_ts]
+    if ssid:
+        where += " AND s.ssid = ?"
+        params.append(ssid)
+    elif link_type:
+        where += " AND s.link_type = ? AND s.ssid IS NULL"
+        params.append(link_type)
     cur = conn.execute(
         f"""
-        SELECT (ts / {bucket}) * {bucket} AS bucket,
-               SUM(bytes_in)  AS bytes_in,
-               SUM(bytes_out) AS bytes_out
-          FROM interface_samples
-         WHERE ts >= ? AND ts < ?
+        SELECT (i.ts / {bucket}) * {bucket} AS bucket,
+               SUM(i.bytes_in)  AS bytes_in,
+               SUM(i.bytes_out) AS bytes_out
+          FROM interface_samples i
+          JOIN sessions s ON s.id = i.session_id
+         {where}
          GROUP BY bucket
          ORDER BY bucket
         """,
-        (from_ts, to_ts),
+        params,
     )
     return [
         {"ts": row[0], "bytes_in": row[1] or 0, "bytes_out": row[2] or 0}

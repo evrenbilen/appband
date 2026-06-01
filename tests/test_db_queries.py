@@ -114,6 +114,24 @@ class DbQueryTest(unittest.TestCase):
         self.assertEqual(result[1]["ts"], 120)
         self.assertEqual(result[1]["bytes_in"], 200)
 
+    def test_timeseries_ssid_filter(self):
+        a = open_session(self.conn, 0, "en0", "wifi", "Office", None, "1.1.1.1")
+        b = open_session(self.conn, 0, "en1", "wifi", "Guest", None, "1.1.1.2")
+        insert_interface_sample(self.conn, ts=10, session_id=a, bytes_in=100, bytes_out=10)
+        insert_interface_sample(self.conn, ts=20, session_id=b, bytes_in=500, bytes_out=50)
+        rows = query_timeseries(self.conn, 0, 3600, "hour", ssid="Office")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["bytes_in"], 100)
+
+    def test_timeseries_link_type_filter_for_null_ssid(self):
+        e = open_session(self.conn, 0, "en5", "ethernet", None, None, "10.0.0.1")
+        w = open_session(self.conn, 0, "en0", "wifi", "Office", None, "1.1.1.1")
+        insert_interface_sample(self.conn, ts=10, session_id=e, bytes_in=200, bytes_out=20)
+        insert_interface_sample(self.conn, ts=20, session_id=w, bytes_in=100, bytes_out=10)
+        rows = query_timeseries(self.conn, 0, 3600, "hour", link_type="ethernet")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["bytes_in"], 200)
+
     def test_timeseries_hourly_aggregation(self):
         sid = open_session(self.conn, 0, "en0", "wifi", "Office", None, "192.168.1.42")
         # 4 samples within the same hour (3600 sec window starting at 0)

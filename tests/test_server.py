@@ -10,7 +10,7 @@ import urllib.error
 from contextlib import closing
 from pathlib import Path
 
-from appband.db import init_schema, open_session, insert_interface_sample, insert_process_sample, insert_connection, record_heartbeat
+from appband.db import init_schema, open_session, insert_interface_sample, insert_process_sample, insert_connection, record_heartbeat, upsert_dns
 from appband.server import build_handler, NetmonServer
 
 
@@ -273,6 +273,50 @@ class ServerTest(unittest.TestCase):
         html = body.decode("utf-8")
         self.assertNotIn("cdn.jsdelivr.net", html)
         self.assertIn("/static/vendor/chart.umd.min.js", html)
+
+    def _seed_two_networks(self):
+        setup = sqlite3.connect(self.db_file)
+        init_schema(setup)
+        office = open_session(setup, 1000, "en0", "wifi", "Office", None, "1.1.1.1")
+        guest = open_session(setup, 1000, "en1", "wifi", "Guest", None, "2.2.2.2")
+        insert_process_sample(setup, ts=1000, session_id=office, process_name="Safari", pid=1, bytes_in=1000, bytes_out=200)
+        insert_connection(setup, ts=1000, session_id=office, process_name="Safari", remote_ip="8.8.8.8", remote_port=443, protocol="tcp", scope="internet")
+        insert_process_sample(setup, ts=1000, session_id=guest, process_name="Mail", pid=2, bytes_in=500, bytes_out=100)
+        insert_connection(setup, ts=1000, session_id=guest, process_name="Mail", remote_ip="9.9.9.9", remote_port=443, protocol="tcp", scope="internet")
+        upsert_dns(setup, ip="8.8.8.8", hostname="google.com", resolved_at=1000)
+        upsert_dns(setup, ip="9.9.9.9", hostname="quad9.net", resolved_at=1000)
+        setup.commit()
+        setup.close()
+
+    def test_by_process_ssid_filter(self):
+        self._seed_two_networks()
+        _, body = self._get("/api/by-process?from=0&to=10000&scope=internet&ssid=Office")
+        names = {r["process_name"] for r in body["rows"]}
+        self.assertIn("Safari", names)
+        self.assertNotIn("Mail", names)
+
+    def test_by_process_scope_all_ssid_filter(self):
+        self._seed_two_networks()
+        _, body = self._get("/api/by-process?from=0&to=10000&scope=all&ssid=Guest")
+        names = {r["process_name"] for r in body["rows"]}
+        self.assertIn("Mail", names)
+        self.assertNotIn("Safari", names)
+
+    def test_by_domain_ssid_filter(self):
+        self._seed_two_networks()
+        _, body = self._get("/api/by-domain?from=0&to=10000&scope=internet&ssid=Office")
+        hosts = {r["host"] for r in body["rows"]}
+        self.assertIn("google.com", hosts)
+        self.assertNotIn("quad9.net", hosts)
+
+    def test_timeseries_ssid_filter_via_api(self):
+        # setUp seeds Office interface_samples; Guest (added here) has none, so
+        # the ssid param must scope the route's result.
+        self._seed_two_networks()
+        _, office = self._get("/api/timeseries?from=0&to=10000&granularity=hour&ssid=Office")
+        _, guest = self._get("/api/timeseries?from=0&to=10000&granularity=hour&ssid=Guest")
+        self.assertGreaterEqual(len(office["timeseries"]), 1)
+        self.assertEqual(guest["timeseries"], [])
 
     def test_by_process_scope_all_returns_all(self):
         setup_conn = sqlite3.connect(self.db_file)
