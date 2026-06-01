@@ -14,7 +14,7 @@ struct AppBandApp: App {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
     private var monitor: NetworkMonitor!
@@ -41,7 +41,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // 2. The shared network monitor (+ ask once for notification permission,
-        //    used for the metered-network alert).
+        //    used for the metered-network alert). The delegate is required so a
+        //    menu-bar (LSUIElement) app shows banners while running, not silent
+        //    queueing to Notification Center.
+        UNUserNotificationCenter.current().delegate = self
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         monitor = NetworkMonitor()
 
@@ -82,6 +85,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .receive(on: RunLoop.main)
             .sink { [weak self] title in self?.statusItem.button?.title = title }
             .store(in: &cancellables)
+    }
+
+    // Show metered-network alerts as banners even though the menu-bar app is
+    // never the foreground "active" app.
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        completionHandler([.banner, .sound])
     }
 
     @objc private func togglePopover(_ sender: NSStatusBarButton) {
