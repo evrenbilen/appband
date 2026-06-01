@@ -9,3 +9,8 @@ __pycache__/
 *.log
 .venv/
 venv/
+
+# IDE / editor
+*.code-workspace
+.idea/
+.vscode/
