@@ -13,6 +13,10 @@ struct LivePopover: View {
             if let s = monitor.session {
                 networkChip(s)
             }
+            if !monitor.topApps.isEmpty {
+                Divider()
+                topAppsSection
+            }
             Divider()
             menuRow(title: "Open Dashboard", systemImage: "safari", shortcut: "D", action: openDashboard)
             menuRow(title: "About AppBand", systemImage: "info.circle", shortcut: nil, action: showAbout)
@@ -78,6 +82,28 @@ struct LivePopover: View {
         }
     }
 
+    private var topAppsSection: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("TOP APPS NOW")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.tertiary)
+                .kerning(0.6)
+            ForEach(monitor.topApps) { app in
+                HStack(spacing: 12) {
+                    Text(app.name)
+                        .font(.system(size: 12))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 0)
+                    Text(formattedBytes(app.bytes))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .monospacedDigit()
+                }
+            }
+        }
+    }
+
     private func networkChip(_ s: NetworkMonitor.Session) -> some View {
         HStack(spacing: 6) {
             Image(systemName: linkTypeIcon(s.linkType))
@@ -125,6 +151,14 @@ struct LivePopover: View {
     private func formattedValue(_ v: Double) -> String {
         if v >= 100 { return String(format: "%.0f", v) }
         return String(format: "%.2f", v)
+    }
+
+    private func formattedBytes(_ n: Double) -> String {
+        let units = ["B", "KB", "MB", "GB", "TB"]
+        var v = n
+        var i = 0
+        while v >= 1024 && i < units.count - 1 { v /= 1024; i += 1 }
+        return i >= 2 ? String(format: "%.1f %@", v, units[i]) : String(format: "%.0f %@", v, units[i])
     }
 
     private func linkTypeIcon(_ lt: String) -> String {

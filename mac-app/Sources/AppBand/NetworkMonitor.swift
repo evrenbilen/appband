@@ -9,10 +9,17 @@ final class NetworkMonitor: ObservableObject {
         let ipAddress: String?
     }
 
+    struct TopApp: Identifiable {
+        let id = UUID()
+        let name: String
+        let bytes: Double   // exact total (in + out) over the last 60s
+    }
+
     @Published var menuBarTitle: String = "↓ — ↑ —"
     @Published var mbpsIn: Double = 0
     @Published var mbpsOut: Double = 0
     @Published var session: Session? = nil
+    @Published var topApps: [TopApp] = []
     @Published var isOnline: Bool = false
 
     private var timer: Timer?
@@ -51,12 +58,25 @@ final class NetworkMonitor: ObservableObject {
             } else {
                 self.session = nil
             }
+
+            // Exact per-app usage over the last 60s (no approximation).
+            if let apps = json["top_apps"] as? [[String: Any]] {
+                self.topApps = apps.compactMap { a in
+                    guard let name = a["process_name"] as? String else { return nil }
+                    let bi = (a["bytes_in"]  as? NSNumber)?.doubleValue ?? 0
+                    let bo = (a["bytes_out"] as? NSNumber)?.doubleValue ?? 0
+                    return TopApp(name: name, bytes: bi + bo)
+                }
+            } else {
+                self.topApps = []
+            }
         } catch {
             self.menuBarTitle = "⚠ offline"
             self.mbpsIn = 0
             self.mbpsOut = 0
             self.isOnline = false
             self.session = nil
+            self.topApps = []
         }
     }
 }
