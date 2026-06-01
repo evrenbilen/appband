@@ -82,8 +82,9 @@ test.describe("AppBand dashboard", () => {
     await page.goto("/");
     const badge = page.locator("#panel-domain .approx-badge");
     await expect(badge).toBeVisible();
-    const title = await badge.getAttribute("title");
-    expect((title || "").length).toBeGreaterThan(15); // the How-to-read explainer
+    // The explainer title is applied by i18n applyDom after load — poll for it
+    // (toHaveAttribute auto-retries) rather than read synchronously, which raced.
+    await expect(badge).toHaveAttribute("title", /.{15,}/, { timeout: 10_000 });
   });
 
   test("a collection gap is surfaced on the Time Series panel", async ({ page }) => {
@@ -99,5 +100,17 @@ test.describe("AppBand dashboard", () => {
     await expect(table).toBeVisible({ timeout: 10_000 });
     await expect(table).toContainText("443");
     await expect(table).toContainText("HTTPS");
+  });
+
+  test("Session History lists past + active sessions", async ({ page }) => {
+    // serve-test.py seeds an active Wi-Fi "TestNet" session and an ended
+    // Ethernet session; /api/sessions returns both within the Today range.
+    await page.goto("/");
+    const table = page.locator("#panel-history .data-table");
+    await expect(table).toBeVisible({ timeout: 10_000 });
+    await expect(table).toContainText("TestNet"); // the active Wi-Fi session
+    await expect(table).toContainText("Ethernet"); // the ended SSID-less session
+    // The active session (ended_at IS NULL) is flagged, not given a duration.
+    await expect(table.locator(".session-active")).toBeVisible();
   });
 });

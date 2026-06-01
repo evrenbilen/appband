@@ -36,6 +36,7 @@
   "panel.by_process.title": "Uygulamaya göre",
   "panel.by_domain.title": "Domain'lere göre",
   "panel.by_domain.note": "yaklaşık",
+  "panel.session_history.title": "Oturum Geçmişi",
   "panel.approx_help": "Yaklaşık: her uygulamanın byte'ları, aynı 5 dakikalık pencerede dokunduğu host'lara/kapsama bölüştürülür. Kesin muhasebe değil, \"trafik muhtemelen buraya gitti\" olarak okuyun.",
 
   "legend.download": "İndirme",
@@ -47,6 +48,10 @@
   "table.port": "Port",
   "table.service": "Servis",
   "table.connections": "Bağlantı",
+  "table.started": "Başlangıç",
+  "table.duration": "Süre",
+  "table.ip": "IP",
+  "session.active": "Aktif",
 
   "state.loading": "Yükleniyor…",
   "state.empty": "Bu aralıkta veri yok.",

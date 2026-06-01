@@ -757,6 +757,19 @@ body {
   letter-spacing: 0.3px;
 }
 
+/* "Active" pill on the currently-open session in the history table. */
+.session-active {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--accent);
+  border-radius: var(--r-badge);
+  padding: 2px 7px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
 /* ─── Language Toggle ───────────────────────────────────────────────────────── */
 .lang-toggle {
   display: flex;

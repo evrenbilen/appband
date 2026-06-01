@@ -43,6 +43,19 @@ const fmtUptime = (startedAt) => {
 };
 
 /**
+ * Format a fixed duration (in seconds) between two timestamps → "2h 5m" / "8m" / "12s".
+ * Unlike fmtUptime this is anchored to two known points, not "now".
+ */
+const fmtDur = (secs) => {
+  if (secs == null || secs < 0) return "—";
+  if (secs < 60) return `${secs}s`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}m`;
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  return m ? `${h}h ${m}m` : `${h}h`;
+};
+
+/**
  * Escape HTML to prevent injection.
  */
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -694,6 +707,49 @@ async function loadByPort() {
   }
 }
 
+async function loadSessions() {
+  const containerId = "history-body";
+  try {
+    const { from, to } = rangeBounds();
+    const data = await fetchJson(`/api/sessions?from=${from}&to=${to}`);
+    if (!data.sessions || data.sessions.length === 0) {
+      showEmpty(containerId);
+      return;
+    }
+    const el = $(containerId);
+    if (!el) return;
+    const rows = data.sessions.map((s) => {
+      const network = s.ssid || `(${linkTypeLabel(s.link_type)})`;
+      // An open session (ended_at IS NULL) is the live one — flag it instead
+      // of computing a duration that would tick every refresh.
+      const duration = s.ended_at
+        ? esc(fmtDur(s.ended_at - s.started_at))
+        : `<span class="session-active">${esc(t("session.active"))}</span>`;
+      return `
+        <tr>
+          <td>${esc(network)}</td>
+          <td>${esc(fmtTime(s.started_at))}</td>
+          <td>${duration}</td>
+          <td>${esc(s.ip_address || "—")}</td>
+        </tr>`;
+    }).join("");
+    el.innerHTML = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>${esc(t("table.network"))}</th>
+            <th>${esc(t("table.started"))}</th>
+            <th>${esc(t("table.duration"))}</th>
+            <th>${esc(t("table.ip"))}</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  } catch (err) {
+    showError(containerId, loadSessions);
+  }
+}
+
 /* ─── Refresh groups ─────────────────────────────────────────────────────── */
 async function refreshFast() {
   await loadCurrent();
@@ -709,6 +765,7 @@ async function refreshAll() {
     loadByProcess(),
     loadByDomain(),
     loadByPort(),
+    loadSessions(),
   ]);
 }
 
