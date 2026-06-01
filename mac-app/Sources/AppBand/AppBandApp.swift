@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Combine
 
 @main
 struct AppBandApp: App {
@@ -16,7 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
     private var monitor: NetworkMonitor!
-    private var titleTimer: Timer?
+    private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 1. First-run installer (idempotent)
@@ -67,22 +68,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let host = NSHostingController(rootView: LivePopover(
             monitor: monitor,
             openDashboard: { [weak self] in self?.openDashboard() },
-            showAbout:     { [weak self] in self?.showAbout() }
+            showAbout:     { [weak self] in self?.showAbout() },
+            showUninstall: { [weak self] in self?.showUninstall() }
         ))
         popover.contentViewController = host
 
-        // 5. Refresh menubar title once per second (cheap — just reads a published property)
-        titleTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            Task { @MainActor in
-                self.statusItem.button?.title = self.monitor.menuBarTitle
-            }
-        }
-        RunLoop.main.add(titleTimer!, forMode: .common)
-    }
-
-    func applicationWillTerminate(_ notification: Notification) {
-        titleTimer?.invalidate()
+        // 5. Update the menubar title only when it actually changes (the monitor
+        //    recomputes it every 5s) — no need for a 1Hz polling timer.
+        monitor.$menuBarTitle
+            .receive(on: RunLoop.main)
+            .sink { [weak self] title in self?.statusItem.button?.title = title }
+            .store(in: &cancellables)
     }
 
     @objc private func togglePopover(_ sender: NSStatusBarButton) {
@@ -124,5 +120,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.alertStyle = .informational
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
+    }
+
+    fileprivate func showUninstall() {
+        popover.performClose(nil)
+        let alert = NSAlert()
+        alert.messageText = "Uninstall AppBand?"
+        alert.informativeText = "This stops and removes the background services. "
+            + "Your collected database is kept unless you also choose to delete it."
+        alert.addButton(withTitle: "Uninstall")
+        alert.addButton(withTitle: "Cancel")
+        alert.showsSuppressionButton = true
+        alert.suppressionButton?.title = "Also delete collected data"
+        alert.alertStyle = .warning
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let purge = alert.suppressionButton?.state == .on
+        let script = BackendInstaller.targetDir.appendingPathComponent("scripts/uninstall.sh")
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/bin/bash")
+        proc.arguments = purge ? [script.path, "--purge"] : [script.path]
+        try? proc.run()
+        proc.waitUntilExit()
+        NSApplication.shared.terminate(nil)
     }
 }

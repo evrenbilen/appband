@@ -1,10 +1,14 @@
 import SwiftUI
 import AppKit
+import ServiceManagement
 
 struct LivePopover: View {
     @ObservedObject var monitor: NetworkMonitor
     let openDashboard: () -> Void
     let showAbout: () -> Void
+    let showUninstall: () -> Void
+
+    @State private var launchAtLogin = (SMAppService.mainApp.status == .enabled)
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -25,8 +29,10 @@ struct LivePopover: View {
             }
             Divider()
             menuRow(title: "Open Dashboard", systemImage: "safari", shortcut: "D", action: openDashboard)
+            loginItemRow
             menuRow(title: "About AppBand", systemImage: "info.circle", shortcut: nil, action: showAbout)
             Divider()
+            menuRow(title: "Uninstall AppBand…", systemImage: "trash", shortcut: nil, action: showUninstall)
             menuRow(title: "Quit Menu Bar", systemImage: "power", shortcut: "Q") {
                 NSApplication.shared.terminate(nil)
             }
@@ -147,6 +153,35 @@ struct LivePopover: View {
         .padding(.horizontal, 9)
         .background(Color.secondary.opacity(0.1))
         .clipShape(Capsule())
+    }
+
+    private var loginItemRow: some View {
+        HoverButton(action: toggleLaunchAtLogin) {
+            HStack(spacing: 9) {
+                Image(systemName: "arrow.right.to.line.circle")
+                    .font(.system(size: 11, weight: .medium))
+                    .frame(width: 14)
+                Text("Start at Login")
+                    .font(.system(size: 13))
+                Spacer(minLength: 12)
+                Image(systemName: launchAtLogin ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(launchAtLogin ? Color.accentColor : Color.secondary)
+            }
+        }
+    }
+
+    private func toggleLaunchAtLogin() {
+        do {
+            if launchAtLogin {
+                try SMAppService.mainApp.unregister()
+            } else {
+                try SMAppService.mainApp.register()
+            }
+            launchAtLogin.toggle()
+        } catch {
+            NSSound.beep()  // best-effort; leave the toggle as-is on failure
+        }
     }
 
     private func menuRow(title: String, systemImage: String, shortcut: String?, action: @escaping () -> Void) -> some View {
