@@ -2,62 +2,135 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>netmon</title>
   <link rel="stylesheet" href="/static/style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
   <script src="/static/app.js" defer></script>
 </head>
 <body>
-  <header>
-    <h1>netmon</h1>
+
+  <!-- ── Sticky filter bar ─────────────────────────────────────────────────── -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <div class="brand-dot"></div>
+      <h1>netmon</h1>
+    </div>
+
     <div class="filters">
-      <label>Aralık:
+      <div class="filter-group">
+        <span class="filter-label">Aralık</span>
         <select id="range">
           <option value="3600">Son saat</option>
           <option value="86400" selected>Son 24 saat</option>
           <option value="604800">Son 7 gün</option>
           <option value="2592000">Son 30 gün</option>
         </select>
-      </label>
-      <label>Ağ:
-        <select id="ssid"><option value="">Tümü</option></select>
-      </label>
-      <label>Trafik:
+      </div>
+
+      <div class="filter-group">
+        <span class="filter-label">Ağ</span>
+        <select id="ssid">
+          <option value="">Tümü</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <span class="filter-label">Trafik</span>
         <select id="scope">
-          <option value="internet" selected>Internet</option>
+          <option value="internet" selected>İnternet</option>
           <option value="lan">LAN</option>
           <option value="all">Hepsi</option>
         </select>
-      </label>
-      <button id="refresh">Yenile</button>
+      </div>
+
+      <button id="btn-refresh">
+        <span class="refresh-icon">↻</span>
+        Yenile
+      </button>
     </div>
   </header>
 
-  <section class="card current">
-    <h2>Şu an</h2>
-    <div id="current-body">Yükleniyor…</div>
-  </section>
+  <!-- ── Main content ───────────────────────────────────────────────────────── -->
+  <main class="main-content">
 
-  <section class="card full">
-    <h2>Zaman Serisi</h2>
-    <canvas id="chart-timeseries" height="80"></canvas>
-  </section>
-
-  <div class="row">
-    <section class="card half">
-      <h2>Ağa göre</h2>
-      <canvas id="chart-network"></canvas>
-      <table id="table-network"></table>
+    <!-- Şu an ---------------------------------------------------------------- -->
+    <section class="card card-live" id="panel-current">
+      <div class="card-header">
+        <div class="live-label">
+          <span class="pulse-dot"></span>
+          Canlı
+        </div>
+        <div id="live-network-badge"></div>
+      </div>
+      <div id="current-body">
+        <!-- skeleton -->
+        <div class="skeleton-stats">
+          <div class="skeleton-stat">
+            <div class="skeleton-line" style="width:40px; height:11px;"></div>
+            <div class="skeleton-line" style="width:110px; height:30px;"></div>
+          </div>
+          <div class="skeleton-stat">
+            <div class="skeleton-line" style="width:40px; height:11px;"></div>
+            <div class="skeleton-line" style="width:110px; height:30px;"></div>
+          </div>
+        </div>
+      </div>
     </section>
-    <section class="card half">
-      <h2>Uygulamaya göre</h2>
-      <canvas id="chart-process"></canvas>
-    </section>
-  </div>
 
-  <section class="card full">
-    <h2>Domain'lere göre <small>(~ yaklaşık)</small></h2>
-    <canvas id="chart-domain" height="80"></canvas>
-  </section>
+    <!-- Zaman Serisi --------------------------------------------------------- -->
+    <section class="card" id="panel-timeseries">
+      <div class="card-header">
+        <span class="card-title">Zaman Serisi</span>
+        <div class="legend-chips">
+          <div class="legend-chip">
+            <span class="legend-dot" style="background:var(--download-color);"></span>İndirme
+          </div>
+          <div class="legend-chip">
+            <span class="legend-dot" style="background:var(--upload-color);"></span>Yükleme
+          </div>
+        </div>
+      </div>
+      <div id="timeseries-body">
+        <div class="skeleton-block" style="height:180px;"></div>
+      </div>
+    </section>
+
+    <!-- Ağa göre + Uygulamaya göre (two-column) ------------------------------ -->
+    <div class="card-row">
+
+      <section class="card" id="panel-network">
+        <div class="card-header">
+          <span class="card-title">Ağa göre</span>
+        </div>
+        <div id="network-body">
+          <div class="skeleton-block" style="height:140px;"></div>
+        </div>
+      </section>
+
+      <section class="card" id="panel-process">
+        <div class="card-header">
+          <span class="card-title">Uygulamaya göre</span>
+          <span class="scope-badge" id="scope-badge-process">İnternet</span>
+        </div>
+        <div id="process-body">
+          <div class="skeleton-block" style="height:200px;"></div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Domain'lere göre ----------------------------------------------------- -->
+    <section class="card" id="panel-domain">
+      <div class="card-header">
+        <span class="card-title">Domain'lere göre</span>
+        <span class="scope-badge" id="scope-badge-domain">İnternet</span>
+      </div>
+      <div id="domain-body">
+        <div class="skeleton-block" style="height:220px;"></div>
+      </div>
+    </section>
+
+  </main>
 </body>
 </html>

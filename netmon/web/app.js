@@ -1,16 +1,51 @@
 "use strict";
 
+/* ─── Helpers ────────────────────────────────────────────────────────────── */
 const $ = (id) => document.getElementById(id);
 
+/**
+ * Format bytes to human-readable string with 1 decimal beyond MB.
+ */
 const fmtBytes = (n) => {
+  if (n == null || isNaN(n)) return "—";
   const units = ["B", "KB", "MB", "GB", "TB"];
   let i = 0;
   while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
-  return `${n.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+  const decimals = i >= 2 ? 1 : 0; // 1 decimal for MB and above
+  return `${n.toFixed(decimals)} ${units[i]}`;
 };
-const fmtMbps = (bytes) => `${(bytes * 8 / 1_000_000).toFixed(2)} Mbps`;
-const fmtTime = (ts) => new Date(ts * 1000).toLocaleString();
 
+/**
+ * Format throughput: bytes-per-second → "1.23 Mbps"
+ */
+const fmtMbps = (bytesPerSec) => {
+  const mbps = (bytesPerSec * 8) / 1_000_000;
+  return mbps.toFixed(2);
+};
+
+/**
+ * Format a unix timestamp into a locale string.
+ */
+const fmtTime = (ts) => new Date(ts * 1000).toLocaleString("tr-TR");
+
+/**
+ * Format relative duration (seconds → "3s 12dk" etc).
+ */
+const fmtUptime = (startedAt) => {
+  const secs = Math.floor(Date.now() / 1000) - startedAt;
+  if (secs < 60) return `${secs}s`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}dk ${secs % 60}s`;
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  return `${h}s ${m}dk`;
+};
+
+/**
+ * Escape HTML to prevent injection.
+ */
+const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/* ─── State ──────────────────────────────────────────────────────────────── */
 const state = {
   range: 86400,
   ssid: "",
@@ -18,9 +53,10 @@ const state = {
   charts: {},
 };
 
+/* ─── Fetch ─────────────────────────────────────────────────────────────── */
 async function fetchJson(path) {
   const r = await fetch(path);
-  if (!r.ok) throw new Error(`${path}: ${r.status}`);
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText} — ${path}`);
   return r.json();
 }
 
@@ -29,147 +65,590 @@ function rangeBounds() {
   return { from: now - state.range, to: now };
 }
 
-async function loadCurrent() {
-  const data = await fetchJson("/api/current");
-  const body = $("current-body");
-  if (!data.session) {
-    body.textContent = "Aktif ağ yok (çevrimdışı).";
-    return;
-  }
-  const s = data.session;
-  body.innerHTML = `
-    <strong>${s.link_type}</strong> • ${s.ssid || "(no SSID)"} • ${s.interface}
-    • ↓ ${fmtMbps(data.bytes_in_60s / 60)} ↑ ${fmtMbps(data.bytes_out_60s / 60)}
-    <br><small>Başlangıç: ${fmtTime(s.started_at)} • IP: ${s.ip_address || "-"}</small>
-  `;
+/* ─── Chart.js shared config ─────────────────────────────────────────────── */
+
+/**
+ * Returns Chart.js options shared by all charts: gridlines, tooltip, font.
+ * @param {'light'|'auto'} _mode — reserved for future explicit theming
+ */
+function commonOptions(overrides = {}) {
+  const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const gridColor = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)";
+  const tickColor = isDark ? "#636366" : "#aeaeb2";
+  const tooltipBg = isDark ? "#2c2c2e" : "#1d1d1f";
+  const tooltipBorder = isDark ? "#3a3a3c" : "transparent";
+
+  return mergeDeep({
+    responsive: true,
+    animation: { duration: 250 },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: tooltipBg,
+        titleColor: "#f5f5f7",
+        bodyColor: "#aeaeb2",
+        borderColor: tooltipBorder,
+        borderWidth: 1,
+        padding: { x: 12, y: 10 },
+        cornerRadius: 8,
+        boxPadding: 4,
+        titleFont: { family: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif", size: 12, weight: "600" },
+        bodyFont: { family: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif", size: 12 },
+      },
+    },
+    scales: {
+      x: {
+        grid: { color: gridColor },
+        ticks: { color: tickColor, font: { size: 11 } },
+        border: { color: gridColor },
+      },
+      y: {
+        grid: { color: gridColor },
+        ticks: { color: tickColor, font: { size: 11 } },
+        border: { color: gridColor },
+      },
+    },
+  }, overrides);
 }
 
-async function loadSsidOptions() {
-  const { from, to } = rangeBounds();
-  const data = await fetchJson(`/api/by-network?from=${from}&to=${to}`);
-  const sel = $("ssid");
-  const current = sel.value;
-  while (sel.options.length > 1) sel.remove(1);
-  for (const row of data.rows) {
-    const v = row.ssid || `(${row.link_type})`;
-    const opt = document.createElement("option");
-    opt.value = v;
-    opt.textContent = v;
-    sel.appendChild(opt);
+/**
+ * Simple deep merge utility (non-array values overwrite).
+ */
+function mergeDeep(target, source) {
+  const out = Object.assign({}, target);
+  for (const key of Object.keys(source)) {
+    if (
+      source[key] !== null &&
+      typeof source[key] === "object" &&
+      !Array.isArray(source[key]) &&
+      typeof target[key] === "object" &&
+      target[key] !== null &&
+      !Array.isArray(target[key])
+    ) {
+      out[key] = mergeDeep(target[key], source[key]);
+    } else {
+      out[key] = source[key];
+    }
   }
-  sel.value = current;
+  return out;
 }
 
+/* ─── Chart create / update ──────────────────────────────────────────────── */
 function makeOrUpdateChart(id, config) {
-  const ctx = $(id).getContext("2d");
+  const canvas = $(id);
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
   if (state.charts[id]) {
-    state.charts[id].data = config.data;
-    state.charts[id].options = config.options || {};
-    state.charts[id].update();
+    const chart = state.charts[id];
+    chart.data = config.data;
+    chart.options = config.options;
+    chart.update("active");
   } else {
     state.charts[id] = new Chart(ctx, config);
   }
 }
 
+/* ─── Panel rendering helpers ────────────────────────────────────────────── */
+
+function showEmpty(containerId, message = "Bu aralıkta veri yok.") {
+  const el = $(containerId);
+  if (!el) return;
+  el.innerHTML = `
+    <div class="empty-state">
+      <div class="empty-icon">📭</div>
+      <div>${esc(message)}</div>
+    </div>`;
+}
+
+function showError(containerId, retryFn) {
+  const el = $(containerId);
+  if (!el) return;
+  el.innerHTML = `
+    <div class="error-state">
+      <span class="error-icon">⚠</span>
+      <span>Veri alınamadı</span>
+      <button class="retry-link" id="retry-${containerId}">Tekrar dene</button>
+    </div>`;
+  const btn = $(`retry-${containerId}`);
+  if (btn && retryFn) btn.addEventListener("click", retryFn);
+}
+
+/**
+ * Inject a <canvas> into a container, destroying any old chart first.
+ */
+function ensureCanvas(containerId, chartId, height) {
+  // Destroy existing chart if present
+  if (state.charts[chartId]) {
+    state.charts[chartId].destroy();
+    delete state.charts[chartId];
+  }
+  const container = $(containerId);
+  if (!container) return;
+  const wrap = document.createElement("div");
+  wrap.className = "chart-wrap";
+  const canvas = document.createElement("canvas");
+  canvas.id = chartId;
+  if (height) canvas.height = height;
+  wrap.appendChild(canvas);
+  container.innerHTML = "";
+  container.appendChild(wrap);
+}
+
+/* ─── Scope badge sync ───────────────────────────────────────────────────── */
+function updateScopeBadges() {
+  const labels = { internet: "İnternet", lan: "LAN", all: "Hepsi" };
+  const label = labels[state.scope] || state.scope;
+  for (const id of ["scope-badge-process", "scope-badge-domain"]) {
+    const el = $(id);
+    if (el) el.textContent = label;
+  }
+}
+
+/* ─── Load: Current ──────────────────────────────────────────────────────── */
+async function loadCurrent() {
+  try {
+    const data = await fetchJson("/api/current");
+    const body = $("current-body");
+    if (!body) return;
+
+    if (!data.session) {
+      body.innerHTML = `
+        <div class="offline-state">
+          <span class="offline-dot"></span>
+          Aktif ağ yok — çevrimdışı.
+        </div>`;
+      const badge = $("live-network-badge");
+      if (badge) badge.innerHTML = "";
+      return;
+    }
+
+    const s = data.session;
+    const dlMbps = fmtMbps(data.bytes_in_60s / 60);
+    const ulMbps = fmtMbps(data.bytes_out_60s / 60);
+    const networkLabel = s.ssid || `(${s.link_type})`;
+
+    // Update badge in header
+    const badge = $("live-network-badge");
+    if (badge) {
+      badge.innerHTML = `<span class="live-meta-badge">${esc(networkLabel)}</span>`;
+    }
+
+    body.innerHTML = `
+      <div class="live-stats">
+        <div class="live-stat">
+          <div class="live-stat-label"><span class="arrow arrow-down">↓</span> İndirme</div>
+          <div class="live-stat-value download">${esc(dlMbps)}<span class="live-stat-unit">Mbps</span></div>
+        </div>
+        <div class="live-divider"></div>
+        <div class="live-stat">
+          <div class="live-stat-label"><span class="arrow arrow-up">↑</span> Yükleme</div>
+          <div class="live-stat-value upload">${esc(ulMbps)}<span class="live-stat-unit">Mbps</span></div>
+        </div>
+      </div>
+      <div class="live-metadata">
+        ${s.ssid ? `<span class="meta-chip"><span class="meta-icon">📶</span>${esc(s.ssid)}</span>` : ""}
+        <span class="meta-chip"><span class="meta-icon">🔌</span>${esc(s.interface)}</span>
+        <span class="meta-chip"><span class="meta-icon">🏷</span>${esc(s.link_type)}</span>
+        ${s.ip_address ? `<span class="meta-chip"><span class="meta-icon">🌐</span>${esc(s.ip_address)}</span>` : ""}
+        <span class="meta-chip">⏱ ${esc(fmtUptime(s.started_at))}</span>
+      </div>
+      <div class="live-since">Bağlantı başlangıcı: ${esc(fmtTime(s.started_at))}</div>`;
+  } catch (err) {
+    showError("current-body", loadCurrent);
+  }
+}
+
+/* ─── Load: SSID options ─────────────────────────────────────────────────── */
+async function loadSsidOptions() {
+  try {
+    const { from, to } = rangeBounds();
+    const data = await fetchJson(`/api/by-network?from=${from}&to=${to}`);
+    const sel = $("ssid");
+    if (!sel) return;
+    const current = sel.value;
+    while (sel.options.length > 1) sel.remove(1);
+    for (const row of data.rows) {
+      const v = row.ssid || `(${row.link_type})`;
+      const opt = document.createElement("option");
+      opt.value = v;
+      opt.textContent = v;
+      sel.appendChild(opt);
+    }
+    // Restore selection if still available
+    if ([...sel.options].some((o) => o.value === current)) sel.value = current;
+  } catch (_) {
+    // Non-critical; fail silently
+  }
+}
+
+/* ─── Load: Timeseries ───────────────────────────────────────────────────── */
 async function loadTimeseries() {
-  const { from, to } = rangeBounds();
-  const granularity = state.range > 86400 * 2 ? "day" : "hour";
-  const data = await fetchJson(`/api/timeseries?from=${from}&to=${to}&granularity=${granularity}`);
-  const labels = data.timeseries.map((r) => fmtTime(r.ts));
-  makeOrUpdateChart("chart-timeseries", {
-    type: "bar",
-    data: {
-      labels,
-      datasets: [
-        { label: "İndirme", data: data.timeseries.map((r) => r.bytes_in), backgroundColor: "#0a84ff" },
-        { label: "Yükleme", data: data.timeseries.map((r) => r.bytes_out), backgroundColor: "#ff9500" },
-      ],
-    },
-    options: {
-      scales: { y: { ticks: { callback: (v) => fmtBytes(v) } } },
-      plugins: { tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmtBytes(c.parsed.y)}` } } },
-    },
-  });
+  const containerId = "timeseries-body";
+  try {
+    const { from, to } = rangeBounds();
+    const granularity = state.range > 86400 * 2 ? "day" : "hour";
+    const data = await fetchJson(`/api/timeseries?from=${from}&to=${to}&granularity=${granularity}`);
+
+    if (!data.timeseries || data.timeseries.length === 0) {
+      showEmpty(containerId);
+      return;
+    }
+
+    ensureCanvas(containerId, "chart-timeseries", 80);
+
+    const labels = data.timeseries.map((r) => {
+      const d = new Date(r.ts * 1000);
+      return granularity === "day"
+        ? d.toLocaleDateString("tr-TR", { day: "numeric", month: "short" })
+        : d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+    });
+
+    makeOrUpdateChart("chart-timeseries", {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "İndirme",
+            data: data.timeseries.map((r) => r.bytes_in),
+            backgroundColor: "rgba(10, 132, 255, 0.85)",
+            borderRadius: 4,
+            borderSkipped: false,
+          },
+          {
+            label: "Yükleme",
+            data: data.timeseries.map((r) => r.bytes_out),
+            backgroundColor: "rgba(255, 149, 0, 0.85)",
+            borderRadius: 4,
+            borderSkipped: false,
+          },
+        ],
+      },
+      options: commonOptions({
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: (c) => ` ${c.dataset.label}: ${fmtBytes(c.parsed.y)}`,
+            },
+          },
+        },
+        scales: {
+          y: { ticks: { callback: (v) => fmtBytes(v) } },
+        },
+      }),
+    });
+  } catch (err) {
+    showError(containerId, loadTimeseries);
+  }
 }
 
-async function refreshFast() { await loadCurrent(); }
-async function refreshAll() {
-  await Promise.all([loadCurrent(), loadSsidOptions(), loadTimeseries(), loadByNetwork(), loadByProcess(), loadByDomain()]);
-}
-
+/* ─── Load: By Network ───────────────────────────────────────────────────── */
 async function loadByNetwork() {
-  const { from, to } = rangeBounds();
-  const data = await fetchJson(`/api/by-network?from=${from}&to=${to}`);
-  const labels = data.rows.map((r) => r.ssid || `(${r.link_type})`);
-  const totals = data.rows.map((r) => r.bytes_in + r.bytes_out);
-  makeOrUpdateChart("chart-network", {
-    type: "doughnut",
-    data: { labels, datasets: [{ data: totals, backgroundColor: ["#0a84ff", "#ff9500", "#30d158", "#bf5af2", "#ff453a"] }] },
-    options: { plugins: { tooltip: { callbacks: { label: (c) => `${c.label}: ${fmtBytes(c.parsed)}` } } } },
-  });
-  const tbl = $("table-network");
-  tbl.innerHTML = "<tr><th>Ağ</th><th class='num'>↓</th><th class='num'>↑</th></tr>" +
-    data.rows.map((r) => `<tr><td>${r.ssid || `(${r.link_type})`}</td><td class='num'>${fmtBytes(r.bytes_in)}</td><td class='num'>${fmtBytes(r.bytes_out)}</td></tr>`).join("");
-}
+  const containerId = "network-body";
+  try {
+    const { from, to } = rangeBounds();
+    const data = await fetchJson(`/api/by-network?from=${from}&to=${to}`);
 
-async function loadByProcess() {
-  const { from, to } = rangeBounds();
-  const data = await fetchJson(`/api/by-process?from=${from}&to=${to}&limit=15&scope=${state.scope}`);
-  makeOrUpdateChart("chart-process", {
-    type: "bar",
-    data: {
-      labels: data.rows.map((r) => r.process_name),
-      datasets: [
-        { label: "↓", data: data.rows.map((r) => r.bytes_in), backgroundColor: "#0a84ff" },
-        { label: "↑", data: data.rows.map((r) => r.bytes_out), backgroundColor: "#ff9500" },
-      ],
-    },
-    options: {
-      indexAxis: "y",
-      scales: { x: { stacked: true, ticks: { callback: (v) => fmtBytes(v) } }, y: { stacked: true } },
-      plugins: { tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${fmtBytes(c.parsed.x)}` } } },
-    },
-  });
-}
+    if (!data.rows || data.rows.length === 0) {
+      showEmpty(containerId);
+      return;
+    }
 
-async function loadByDomain() {
-  const { from, to } = rangeBounds();
-  const data = await fetchJson(`/api/by-domain?from=${from}&to=${to}&limit=30&scope=${state.scope}`);
-  makeOrUpdateChart("chart-domain", {
-    type: "bar",
-    data: {
-      labels: data.rows.map((r) => "~ " + r.host),
-      datasets: [
-        { label: "↓", data: data.rows.map((r) => r.bytes_in), backgroundColor: "#0a84ff" },
-        { label: "↑", data: data.rows.map((r) => r.bytes_out), backgroundColor: "#ff9500" },
-      ],
-    },
-    options: {
-      indexAxis: "y",
-      scales: { x: { stacked: true, ticks: { callback: (v) => fmtBytes(v) } }, y: { stacked: true } },
-      plugins: {
-        tooltip: {
-          callbacks: {
-            title: (c) => `${c[0].label} (yaklaşık)`,
-            label: (c) => `${c.dataset.label}: ${fmtBytes(c.parsed.x)}`,
-            afterBody: () => "Yaklaşık: süreç byte'ı bağlantılara dağıtıldı.",
+    const COLORS = [
+      "rgba(10, 132, 255, 0.85)",
+      "rgba(255, 149, 0, 0.85)",
+      "rgba(48, 209, 88, 0.85)",
+      "rgba(191, 90, 242, 0.85)",
+      "rgba(255, 69, 58, 0.85)",
+      "rgba(90, 200, 250, 0.85)",
+    ];
+
+    const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const cardBg = isDark ? "#1c1c1e" : "#ffffff";
+
+    ensureCanvas(containerId, "chart-network", undefined);
+
+    const labels = data.rows.map((r) => r.ssid || `(${r.link_type})`);
+    const totals = data.rows.map((r) => r.bytes_in + r.bytes_out);
+
+    makeOrUpdateChart("chart-network", {
+      type: "doughnut",
+      data: {
+        labels,
+        datasets: [{
+          data: totals,
+          backgroundColor: COLORS.slice(0, labels.length),
+          borderColor: cardBg,
+          borderWidth: 3,
+          hoverOffset: 4,
+        }],
+      },
+      options: {
+        responsive: true,
+        animation: { duration: 250 },
+        cutout: "62%",
+        plugins: {
+          legend: {
+            display: true,
+            position: "bottom",
+            labels: {
+              font: { size: 11 },
+              color: isDark ? "#98989d" : "#6e6e73",
+              padding: 12,
+              usePointStyle: true,
+              pointStyleWidth: 8,
+            },
+          },
+          tooltip: {
+            backgroundColor: isDark ? "#2c2c2e" : "#1d1d1f",
+            titleColor: "#f5f5f7",
+            bodyColor: "#aeaeb2",
+            cornerRadius: 8,
+            padding: { x: 12, y: 10 },
+            callbacks: {
+              label: (c) => ` ${c.label}: ${fmtBytes(c.parsed)}`,
+            },
           },
         },
       },
-    },
-  });
+    });
+
+    // Append table below chart
+    const container = $(containerId);
+    if (container) {
+      const wrap = document.createElement("div");
+      wrap.className = "network-table-wrap";
+      wrap.innerHTML = `
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Ağ</th>
+              <th class="num">↓ İndirme</th>
+              <th class="num">↑ Yükleme</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.rows.map((r) => `
+              <tr>
+                <td>${esc(r.ssid || `(${r.link_type})`)}</td>
+                <td class="num">${fmtBytes(r.bytes_in)}</td>
+                <td class="num">${fmtBytes(r.bytes_out)}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>`;
+      container.appendChild(wrap);
+    }
+  } catch (err) {
+    showError(containerId, loadByNetwork);
+  }
 }
 
+/* ─── Load: By Process ───────────────────────────────────────────────────── */
+async function loadByProcess() {
+  const containerId = "process-body";
+  try {
+    const { from, to } = rangeBounds();
+    const data = await fetchJson(`/api/by-process?from=${from}&to=${to}&limit=15&scope=${state.scope}`);
+
+    if (!data.rows || data.rows.length === 0) {
+      showEmpty(containerId);
+      return;
+    }
+
+    ensureCanvas(containerId, "chart-process", undefined);
+
+    const labels = data.rows.map((r) => r.process_name);
+
+    makeOrUpdateChart("chart-process", {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "İndirme",
+            data: data.rows.map((r) => r.bytes_in),
+            backgroundColor: "rgba(10, 132, 255, 0.85)",
+            borderRadius: 3,
+            borderSkipped: false,
+          },
+          {
+            label: "Yükleme",
+            data: data.rows.map((r) => r.bytes_out),
+            backgroundColor: "rgba(255, 149, 0, 0.85)",
+            borderRadius: 3,
+            borderSkipped: false,
+          },
+        ],
+      },
+      options: commonOptions({
+        indexAxis: "y",
+        plugins: {
+          tooltip: {
+            callbacks: {
+              label: (c) => ` ${c.dataset.label}: ${fmtBytes(c.parsed.x)}`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            stacked: true,
+            ticks: { callback: (v) => fmtBytes(v) },
+          },
+          y: {
+            stacked: true,
+            ticks: { font: { size: 11 } },
+          },
+        },
+      }),
+    });
+  } catch (err) {
+    showError(containerId, loadByProcess);
+  }
+}
+
+/* ─── Load: By Domain ────────────────────────────────────────────────────── */
+async function loadByDomain() {
+  const containerId = "domain-body";
+  try {
+    const { from, to } = rangeBounds();
+    const data = await fetchJson(`/api/by-domain?from=${from}&to=${to}&limit=30&scope=${state.scope}`);
+
+    if (!data.rows || data.rows.length === 0) {
+      showEmpty(containerId);
+      return;
+    }
+
+    ensureCanvas(containerId, "chart-domain", 80);
+
+    // For labels we just use the host name (no "~" prefix — approximate is shown as badge in tooltip)
+    const labels = data.rows.map((r) => r.host);
+    const approxMap = new Map(data.rows.map((r) => [r.host, r.approximate]));
+
+    makeOrUpdateChart("chart-domain", {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "İndirme",
+            data: data.rows.map((r) => r.bytes_in),
+            backgroundColor: "rgba(10, 132, 255, 0.85)",
+            borderRadius: 3,
+            borderSkipped: false,
+          },
+          {
+            label: "Yükleme",
+            data: data.rows.map((r) => r.bytes_out),
+            backgroundColor: "rgba(255, 149, 0, 0.85)",
+            borderRadius: 3,
+            borderSkipped: false,
+          },
+        ],
+      },
+      options: commonOptions({
+        indexAxis: "y",
+        plugins: {
+          tooltip: {
+            callbacks: {
+              title: (items) => {
+                const host = items[0]?.label ?? "";
+                const isApprox = approxMap.get(host);
+                return isApprox ? `${host}  ≈ yaklaşık` : host;
+              },
+              label: (c) => ` ${c.dataset.label}: ${fmtBytes(c.parsed.x)}`,
+              afterBody: (items) => {
+                const host = items[0]?.label ?? "";
+                if (approxMap.get(host)) {
+                  return ["", "Yaklaşık: süreç byte'ı bağlantılara dağıtıldı."];
+                }
+                return [];
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            stacked: true,
+            ticks: { callback: (v) => fmtBytes(v) },
+          },
+          y: {
+            stacked: true,
+            ticks: { font: { size: 11 } },
+          },
+        },
+      }),
+    });
+  } catch (err) {
+    showError(containerId, loadByDomain);
+  }
+}
+
+/* ─── Refresh groups ─────────────────────────────────────────────────────── */
+async function refreshFast() {
+  await loadCurrent();
+}
+
+async function refreshAll() {
+  updateScopeBadges();
+  await Promise.allSettled([
+    loadCurrent(),
+    loadSsidOptions(),
+    loadTimeseries(),
+    loadByNetwork(),
+    loadByProcess(),
+    loadByDomain(),
+  ]);
+}
+
+/* ─── Refresh button spinner ─────────────────────────────────────────────── */
+function withRefreshSpinner(fn) {
+  return async () => {
+    const btn = $("btn-refresh");
+    if (btn) btn.classList.add("spinning");
+    try {
+      await fn();
+    } finally {
+      if (btn) {
+        // Remove and re-add so animation restarts if clicked quickly
+        btn.classList.remove("spinning");
+      }
+    }
+  };
+}
+
+/* ─── Theme change: re-render charts ─────────────────────────────────────── */
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  // Destroy all charts so they rebuild with updated colors
+  for (const id of Object.keys(state.charts)) {
+    state.charts[id].destroy();
+    delete state.charts[id];
+  }
+  refreshAll();
+});
+
+/* ─── Event binding ──────────────────────────────────────────────────────── */
 function bind() {
-  $("range").addEventListener("change", (e) => { state.range = parseInt(e.target.value, 10); refreshAll(); });
-  $("ssid").addEventListener("change", (e) => { state.ssid = e.target.value; refreshAll(); });
-  $("scope").addEventListener("change", (e) => { state.scope = e.target.value; refreshAll(); });
-  $("refresh").addEventListener("click", () => refreshAll());
+  $("range").addEventListener("change", (e) => {
+    state.range = parseInt(e.target.value, 10);
+    refreshAll();
+  });
+  $("ssid").addEventListener("change", (e) => {
+    state.ssid = e.target.value;
+    refreshAll();
+  });
+  $("scope").addEventListener("change", (e) => {
+    state.scope = e.target.value;
+    updateScopeBadges();
+    // Scope only affects by-process and by-domain
+    Promise.allSettled([loadByProcess(), loadByDomain()]);
+  });
+  $("btn-refresh").addEventListener("click", withRefreshSpinner(refreshAll));
 }
 
+/* ─── Boot ───────────────────────────────────────────────────────────────── */
 window.addEventListener("DOMContentLoaded", () => {
   bind();
   refreshAll();
-  setInterval(refreshFast, 5000);
-  setInterval(refreshAll, 60000);
+  setInterval(refreshFast, 5_000);
+  setInterval(refreshAll, 60_000);
 });
