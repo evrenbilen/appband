@@ -45,6 +45,8 @@ class InitSchemaTest(unittest.TestCase):
         )}
         self.assertIn("idx_proc_session", idx)
         self.assertIn("idx_conn_session", idx)
+        # Supports the by-domain/by-process GROUP BY (process_name, bucket).
+        self.assertIn("idx_conn_proc_ts", idx)
 
     def test_wal_mode_enabled(self):
         init_schema(self.conn)

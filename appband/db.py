@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS connections (
 CREATE INDEX IF NOT EXISTS idx_conn_ts ON connections(ts);
 CREATE INDEX IF NOT EXISTS idx_conn_ip ON connections(remote_ip);
 CREATE INDEX IF NOT EXISTS idx_conn_session ON connections(session_id);
+CREATE INDEX IF NOT EXISTS idx_conn_proc_ts ON connections(process_name, ts);
 
 CREATE TABLE IF NOT EXISTS dns_cache (
   ip           TEXT PRIMARY KEY,
