@@ -250,6 +250,16 @@ class ServerTest(unittest.TestCase):
         _, body = self._get("/api/health")
         self.assertEqual(body["status"], "down")
 
+    def test_client_disconnect_does_not_break_server(self):
+        # A client that hangs up mid-response must not take the server down or
+        # spew tracebacks; subsequent requests still succeed.
+        import socket
+        s = socket.create_connection(("127.0.0.1", self.port), timeout=2)
+        s.sendall(b"GET /api/current HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+        s.close()  # disconnect without reading the response
+        status, _ = self._get("/api/current")
+        self.assertEqual(status, 200)
+
     def test_chartjs_is_self_hosted(self):
         status, headers, body = self._raw_get("/static/vendor/chart.umd.min.js")
         self.assertEqual(status, 200)

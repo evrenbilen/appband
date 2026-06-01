@@ -104,6 +104,14 @@ def build_handler(db_path: Path) -> type:
             self.wfile.write(data)
 
         def do_GET(self):  # noqa: N802
+            try:
+                self._route()
+            except (BrokenPipeError, ConnectionResetError):
+                # Client hung up mid-response; nothing left to send. Stay quiet
+                # rather than logging a traceback per disconnect.
+                pass
+
+        def _route(self):
             # DNS-rebinding / cross-origin defense. Binding 127.0.0.1 does not
             # stop a malicious page the user has open from rebinding its domain
             # to 127.0.0.1 and reading this unauthenticated API. Require the
