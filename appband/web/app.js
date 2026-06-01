@@ -317,9 +317,11 @@ async function loadSsidOptions() {
     for (const row of data.rows) {
       const label = row.ssid || `(${linkTypeLabel(row.link_type)})`;
       const opt = document.createElement("option");
-      // Encode so the change handler can tell a real SSID from a link-type
-      // network (the server filters by ssid OR link_type accordingly).
-      opt.value = row.ssid ? row.ssid : `lt:${row.link_type}`;
+      opt.value = label;
+      // Carry the real discriminator out-of-band so an SSID can be ANY string
+      // (no in-value prefix to collide with). Server filters by ssid OR link_type.
+      if (row.ssid) opt.dataset.ssid = row.ssid;
+      else opt.dataset.link = row.link_type;
       opt.textContent = label;
       sel.appendChild(opt);
     }
@@ -707,14 +709,9 @@ function bind() {
     refreshAll();
   });
   $("ssid").addEventListener("change", (e) => {
-    const v = e.target.value;
-    if (v.startsWith("lt:")) {
-      state.ssid = "";
-      state.linkType = v.slice(3);
-    } else {
-      state.ssid = v;
-      state.linkType = "";
-    }
+    const opt = e.target.selectedOptions[0];
+    state.ssid = (opt && opt.dataset.ssid) || "";
+    state.linkType = (opt && opt.dataset.link) || "";
     refreshAll();
   });
   $("scope").addEventListener("change", (e) => {
