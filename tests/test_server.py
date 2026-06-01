@@ -9,8 +9,8 @@ import urllib.error
 from contextlib import closing
 from pathlib import Path
 
-from netmon.db import init_schema, open_session, insert_interface_sample, insert_process_sample, insert_connection
-from netmon.server import build_handler, NetmonServer
+from appband.db import init_schema, open_session, insert_interface_sample, insert_process_sample, insert_connection
+from appband.server import build_handler, NetmonServer
 
 
 class ServerTest(unittest.TestCase):

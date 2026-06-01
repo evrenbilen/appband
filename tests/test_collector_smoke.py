@@ -5,9 +5,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from netmon.collector import CollectorState, _thread_local, run_connection_tick, run_interface_tick, run_process_tick
-from netmon.db import init_schema, open_session
-from netmon.delta import DeltaTracker
+from appband.collector import CollectorState, _thread_local, run_connection_tick, run_interface_tick, run_process_tick
+from appband.db import init_schema, open_session
+from appband.delta import DeltaTracker
 
 
 class CollectorTickTest(unittest.TestCase):
@@ -62,13 +62,13 @@ class CollectorTickTest(unittest.TestCase):
             {"process_name": "dst1", "pid": 1, "bytes_in": 1100, "bytes_out": 200},
             {"process_name": "dst2", "pid": 2, "bytes_in": 400, "bytes_out": 100},
         ]
-        with patch("netmon.collector.parse_nettop", return_value=sample1), \
-             patch("netmon.collector._run", return_value="dummy"):
+        with patch("appband.collector.parse_nettop", return_value=sample1), \
+             patch("appband.collector._run", return_value="dummy"):
             run_interface_tick(self.state, now=1000)
             self.assertEqual(self._check("SELECT COUNT(*) FROM interface_samples")[0], 0)
 
-        with patch("netmon.collector.parse_nettop", return_value=sample2), \
-             patch("netmon.collector._run", return_value="dummy"):
+        with patch("appband.collector.parse_nettop", return_value=sample2), \
+             patch("appband.collector._run", return_value="dummy"):
             run_interface_tick(self.state, now=1005)
             row = self._check("SELECT bytes_in, bytes_out FROM interface_samples")
             # sum1 = 1000/200, sum2 = 1500/300 → delta = 500/100
@@ -77,8 +77,8 @@ class CollectorTickTest(unittest.TestCase):
     def test_skips_when_no_active_session(self):
         self.state.active_session_id = None
         sample = [{"process_name": "p", "pid": 1, "bytes_in": 1000, "bytes_out": 200}]
-        with patch("netmon.collector.parse_nettop", return_value=sample), \
-             patch("netmon.collector._run", return_value="dummy"):
+        with patch("appband.collector.parse_nettop", return_value=sample), \
+             patch("appband.collector._run", return_value="dummy"):
             run_interface_tick(self.state, now=1000)
             run_interface_tick(self.state, now=1005)
             self.assertEqual(self._check("SELECT COUNT(*) FROM interface_samples")[0], 0)
@@ -86,11 +86,11 @@ class CollectorTickTest(unittest.TestCase):
     def test_process_tick_records_delta(self):
         sample1 = [{"process_name": "Chrome", "pid": 42, "bytes_in": 1000, "bytes_out": 100}]
         sample2 = [{"process_name": "Chrome", "pid": 42, "bytes_in": 1500, "bytes_out": 200}]
-        with patch("netmon.collector.parse_nettop", return_value=sample1), \
-             patch("netmon.collector._run", return_value=""):
+        with patch("appband.collector.parse_nettop", return_value=sample1), \
+             patch("appband.collector._run", return_value=""):
             run_process_tick(self.state, now=1000)
-        with patch("netmon.collector.parse_nettop", return_value=sample2), \
-             patch("netmon.collector._run", return_value=""):
+        with patch("appband.collector.parse_nettop", return_value=sample2), \
+             patch("appband.collector._run", return_value=""):
             run_process_tick(self.state, now=1010)
         row = self._check("SELECT process_name, bytes_in, bytes_out FROM process_samples")
         self.assertEqual(row, ("Chrome", 500, 100))
@@ -102,8 +102,8 @@ class CollectorTickTest(unittest.TestCase):
             {"process_name": "Chrome", "pid": 42, "remote_ip": "1.2.3.4", "remote_port": 443, "protocol": "tcp", "scope": "internet"},
             {"process_name": "zoom.us", "pid": 88, "remote_ip": "5.6.7.8", "remote_port": 8801, "protocol": "udp", "scope": "internet"},
         ]
-        with patch("netmon.collector.parse_lsof_connections", return_value=rows), \
-             patch("netmon.collector._run", return_value=""):
+        with patch("appband.collector.parse_lsof_connections", return_value=rows), \
+             patch("appband.collector._run", return_value=""):
             run_connection_tick(self.state, now=1000)
         self.assertEqual(self._check("SELECT COUNT(*) FROM connections")[0], 2)
         self.assertEqual(set(enqueued), {"1.2.3.4", "5.6.7.8"})

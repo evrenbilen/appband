@@ -2,8 +2,8 @@ import sqlite3
 import unittest
 from unittest.mock import patch
 
-from netmon.db import init_schema, get_active_session
-from netmon.session_watcher import SessionWatcher, NetworkSnapshot
+from appband.db import init_schema, get_active_session
+from appband.session_watcher import SessionWatcher, NetworkSnapshot
 
 
 class SessionWatcherTest(unittest.TestCase):
@@ -65,8 +65,8 @@ class SessionWatcherTest(unittest.TestCase):
 
 class CollectSnapshotTest(unittest.TestCase):
     def test_collect_snapshot_offline(self):
-        from netmon.session_watcher import collect_snapshot
-        with patch("netmon.session_watcher._run", return_value=""):
+        from appband.session_watcher import collect_snapshot
+        with patch("appband.session_watcher._run", return_value=""):
             self.assertIsNone(collect_snapshot())
 
 

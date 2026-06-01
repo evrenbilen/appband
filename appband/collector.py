@@ -1,4 +1,4 @@
-"""netmon collector daemon: orchestrates pollers and writes to SQLite."""
+"""appband collector daemon: orchestrates pollers and writes to SQLite."""
 from __future__ import annotations
 
 import asyncio
@@ -12,21 +12,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from netmon.config import Config, load_config
-from netmon.db import (
+from appband.config import Config, load_config
+from appband.db import (
     connect,
     insert_connection,
     insert_interface_sample,
     insert_process_sample,
 )
-from netmon.delta import DeltaTracker
-from netmon.dns_cache import DnsResolver
-from netmon.parsers.lsof import parse_lsof_connections
-from netmon.parsers.nettop import parse_nettop
-from netmon.retention import purge_old, vacuum
-from netmon.session_watcher import SessionWatcher, collect_snapshot
+from appband.delta import DeltaTracker
+from appband.dns_cache import DnsResolver
+from appband.parsers.lsof import parse_lsof_connections
+from appband.parsers.nettop import parse_nettop
+from appband.retention import purge_old, vacuum
+from appband.session_watcher import SessionWatcher, collect_snapshot
 
-log = logging.getLogger("netmon.collector")
+log = logging.getLogger("appband.collector")
 
 # Thread-local storage — each writer thread gets its own sqlite3.Connection.
 _thread_local = threading.local()
@@ -155,7 +155,7 @@ def _setup_logging(cfg: Config) -> None:
     handler.setFormatter(
         logging.Formatter("%(asctime)s %(levelname)s %(name)s %(threadName)s %(message)s")
     )
-    root = logging.getLogger("netmon")
+    root = logging.getLogger("appband")
     root.addHandler(handler)
     root.setLevel(cfg.log_level)
 
@@ -163,7 +163,7 @@ def _setup_logging(cfg: Config) -> None:
 def main(config_path: Path | None = None) -> int:
     cfg = load_config(config_path)
     _setup_logging(cfg)
-    log.info("netmon collector starting")
+    log.info("appband collector starting")
 
     # Run schema migration once at startup with a short-lived connection.
     # Each worker thread will open its own connection lazily via _conn().
@@ -290,7 +290,7 @@ def main(config_path: Path | None = None) -> int:
 
     # Close the active session using a fresh short-lived connection.
     if state.active_session_id is not None:
-        from netmon.db import close_session
+        from appband.db import close_session
         shutdown_conn = sqlite3.connect(str(cfg.db_path), isolation_level=None, timeout=10.0)
         shutdown_conn.execute("PRAGMA journal_mode=WAL")
         close_session(shutdown_conn, state.active_session_id, ended_at=int(time.time()))
@@ -303,7 +303,7 @@ def main(config_path: Path | None = None) -> int:
         loop.stop()
 
     loop.call_soon_threadsafe(_cancel_and_stop)
-    log.info("netmon collector exited cleanly")
+    log.info("appband collector exited cleanly")
     return 0
 
 

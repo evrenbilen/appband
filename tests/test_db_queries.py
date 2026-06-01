@@ -1,7 +1,7 @@
 import sqlite3
 import unittest
 
-from netmon.db import (
+from appband.db import (
     init_schema,
     open_session,
     close_session,

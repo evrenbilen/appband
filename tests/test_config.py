@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from netmon.config import Config, load_config
+from appband.config import Config, load_config
 
 
 class ConfigTest(unittest.TestCase):
@@ -17,7 +17,7 @@ class ConfigTest(unittest.TestCase):
         self.assertEqual(cfg.session_poll_sec, 2)
         self.assertEqual(cfg.retention_days, 30)
         self.assertEqual(cfg.log_level, "INFO")
-        self.assertTrue(str(cfg.db_path).endswith("netmon.db"))
+        self.assertTrue(str(cfg.db_path).endswith("appband.db"))
 
     def test_load_with_override_file(self):
         with tempfile.TemporaryDirectory() as tmp:

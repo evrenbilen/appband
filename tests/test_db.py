@@ -1,7 +1,7 @@
 import sqlite3
 import unittest
 
-from netmon.db import init_schema
+from appband.db import init_schema
 
 
 class InitSchemaTest(unittest.TestCase):

@@ -4,8 +4,8 @@ import sqlite3
 import unittest
 from unittest.mock import patch
 
-from netmon.db import init_schema, get_dns_hostname
-from netmon.dns_cache import DnsResolver
+from appband.db import init_schema, get_dns_hostname
+from appband.dns_cache import DnsResolver
 
 
 class DnsResolverTest(unittest.TestCase):

@@ -5,15 +5,15 @@ import logging
 import subprocess
 from dataclasses import dataclass
 
-from netmon.db import close_session, get_active_session, open_session
-from netmon.parsers.network_info import (
+from appband.db import close_session, get_active_session, open_session
+from appband.parsers.network_info import (
     classify_link_type,
     parse_default_interface,
     parse_ifconfig,
     parse_ipconfig_summary,
 )
 
-log = logging.getLogger("netmon.session")
+log = logging.getLogger("appband.session")
 
 
 @dataclass(frozen=True)

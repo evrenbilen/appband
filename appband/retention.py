@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 
-log = logging.getLogger("netmon.retention")
+log = logging.getLogger("appband.retention")
 
 
 def purge_old(

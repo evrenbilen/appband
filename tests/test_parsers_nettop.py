@@ -1,6 +1,6 @@
 import unittest
 
-from netmon.parsers.nettop import parse_nettop
+from appband.parsers.nettop import parse_nettop
 
 
 SYNTHETIC = (

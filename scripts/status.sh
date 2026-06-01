@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DATA_DIR="$HOME/Library/Application Support/netmon"
-LOG_DIR="$HOME/Library/Logs/netmon"
-DB="$DATA_DIR/netmon.db"
+DATA_DIR="$HOME/Library/Application Support/appband"
+LOG_DIR="$HOME/Library/Logs/appband"
+DB="$DATA_DIR/appband.db"
 
 echo "== launchctl =="
-launchctl list | grep netmon || echo "(no netmon services loaded)"
+launchctl list | grep appband || echo "(no appband services loaded)"
 
 echo
 echo "== DB =="

@@ -1,4 +1,4 @@
-"""netmon config: dataclass with defaults + optional JSON override."""
+"""appband config: dataclass with defaults + optional JSON override."""
 from __future__ import annotations
 
 import json
@@ -7,11 +7,11 @@ from pathlib import Path
 
 
 def _default_db_path() -> Path:
-    return Path.home() / "Library" / "Application Support" / "netmon" / "netmon.db"
+    return Path.home() / "Library" / "Application Support" / "appband" / "appband.db"
 
 
 def _default_log_dir() -> Path:
-    return Path.home() / "Library" / "Logs" / "netmon"
+    return Path.home() / "Library" / "Logs" / "appband"
 
 
 @dataclass

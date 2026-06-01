@@ -1,7 +1,7 @@
 import sqlite3
 import unittest
 
-from netmon.db import (
+from appband.db import (
     init_schema,
     open_session,
     close_session,
@@ -10,7 +10,7 @@ from netmon.db import (
     insert_connection,
     upsert_dns,
 )
-from netmon.retention import purge_old
+from appband.retention import purge_old
 
 # Use a fixed reference timestamp that is well into the future relative to the
 # retention windows so the maths in purge_old produce positive cutoffs.

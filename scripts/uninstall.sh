@@ -2,13 +2,13 @@
 set -euo pipefail
 
 LAUNCH_AGENTS="$HOME/Library/LaunchAgents"
-DATA_DIR="$HOME/Library/Application Support/netmon"
+DATA_DIR="$HOME/Library/Application Support/appband"
 PURGE=0
 [[ "${1:-}" == "--purge" ]] && PURGE=1
 
 for label in collector server; do
-  plist="$LAUNCH_AGENTS/com.evren.netmon.${label}.plist"
-  launchctl bootout "gui/$UID/com.evren.netmon.${label}" 2>/dev/null || true
+  plist="$LAUNCH_AGENTS/dev.appband.${label}.plist"
+  launchctl bootout "gui/$UID/dev.appband.${label}" 2>/dev/null || true
   rm -f "$plist"
   echo "removed: $plist"
 done

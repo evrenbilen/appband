@@ -6,7 +6,7 @@ import socket
 import sqlite3
 import time
 
-from netmon.db import upsert_dns
+from appband.db import upsert_dns
 
 FAILURE_RETRY_SEC = 24 * 3600
 SUCCESS_RETRY_SEC = 90 * 24 * 3600

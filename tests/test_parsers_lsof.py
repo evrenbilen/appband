@@ -1,6 +1,6 @@
 import unittest
 
-from netmon.parsers.lsof import parse_lsof_connections
+from appband.parsers.lsof import parse_lsof_connections
 
 SAMPLE = (
     "COMMAND     PID USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME\n"

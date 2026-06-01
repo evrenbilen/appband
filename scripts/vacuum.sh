@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DB="$HOME/Library/Application Support/netmon/netmon.db"
+DB="$HOME/Library/Application Support/appband/appband.db"
 if [[ ! -f "$DB" ]]; then
   echo "No DB at $DB"
   exit 1

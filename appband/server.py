@@ -1,4 +1,4 @@
-"""netmon HTTP server: localhost-only JSON API + static dashboard."""
+"""appband HTTP server: localhost-only JSON API + static dashboard."""
 from __future__ import annotations
 
 import json
@@ -9,9 +9,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from netmon.config import load_config
+from appband.config import load_config
 
-log = logging.getLogger("netmon.server")
+log = logging.getLogger("appband.server")
 WEB_ROOT = Path(__file__).parent / "web"
 
 
@@ -89,7 +89,7 @@ def build_handler(db_path: Path) -> type:
                 elif path == "/api/sessions":
                     self._json({"sessions": self._sessions(conn, from_ts, to_ts)})
                 elif path == "/api/timeseries":
-                    from netmon.db import query_timeseries
+                    from appband.db import query_timeseries
                     gran = qs.get("granularity", ["hour"])[0]
                     self._json({"timeseries": query_timeseries(conn, from_ts, to_ts, gran)})
                 elif path == "/api/by-network":
@@ -271,10 +271,10 @@ def main(config_path: Path | None = None) -> int:
     cfg.log_dir.mkdir(parents=True, exist_ok=True)
     handler = logging.FileHandler(cfg.log_dir / "server.log")
     handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
-    root = logging.getLogger("netmon")
+    root = logging.getLogger("appband")
     root.addHandler(handler)
     root.setLevel(cfg.log_level)
-    log.info("netmon server starting on %s:%d", cfg.bind_host, cfg.port)
+    log.info("appband server starting on %s:%d", cfg.bind_host, cfg.port)
 
     server = NetmonServer((cfg.bind_host, cfg.port), build_handler(cfg.db_path))
     try:

@@ -1,6 +1,6 @@
 import unittest
 
-from netmon.delta import DeltaTracker
+from appband.delta import DeltaTracker
 
 
 class DeltaTrackerTest(unittest.TestCase):

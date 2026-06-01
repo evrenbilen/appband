@@ -1,6 +1,6 @@
 import unittest
 
-from netmon.parsers.network_info import (
+from appband.parsers.network_info import (
     parse_default_interface,
     parse_airport_ssid,
     parse_ifconfig,

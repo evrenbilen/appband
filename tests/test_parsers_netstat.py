@@ -1,7 +1,7 @@
 import unittest
 from pathlib import Path
 
-from netmon.parsers.netstat import parse_netstat_ibn
+from appband.parsers.netstat import parse_netstat_ibn
 
 FIXTURE = Path(__file__).parent / "fixtures" / "netstat_ibn.txt"
 
