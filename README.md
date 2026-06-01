@@ -4,6 +4,8 @@
 
 **[⬇ Download AppBand 0.1.4 (DMG)](https://github.com/evrenbilen/appband/releases/latest)**  ·  macOS 13+  ·  ~500 KB
 
+[Gatekeeper bypass (first launch only)](https://github.com/evrenbilen/appband/edit/main/README.md#gatekeeper-bypass-first-launch-only)
+
 ## Screenshots
 
 ### Dashboard
