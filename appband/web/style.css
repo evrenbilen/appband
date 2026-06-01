@@ -643,6 +643,51 @@ body {
   letter-spacing: 0.3px;
 }
 
+/* ─── Language Toggle ───────────────────────────────────────────────────────── */
+.lang-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-input);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+}
+
+.lang-btn {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--card);
+  border: none;
+  padding: 5px 10px;
+  cursor: pointer;
+  outline: none;
+  transition: background-color 0.15s, color 0.15s;
+  line-height: 1;
+  letter-spacing: 0.3px;
+}
+
+.lang-btn:first-child {
+  border-right: 1px solid var(--border);
+}
+
+.lang-btn:hover {
+  color: var(--text);
+  background: var(--bg);
+}
+
+.lang-btn--active {
+  color: var(--accent);
+  background: var(--bg);
+}
+
+.lang-btn:focus {
+  box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.25) inset;
+}
+
 /* ─── Scrollbar ─────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

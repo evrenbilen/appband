@@ -58,6 +58,7 @@ def build_handler(db_path: Path) -> type:
                 ".html": "text/html; charset=utf-8",
                 ".js": "application/javascript; charset=utf-8",
                 ".css": "text/css; charset=utf-8",
+                ".json": "application/json; charset=utf-8",
             }.get(ext, "application/octet-stream")
             self.send_response(200)
             self.send_header("Content-Type", ctype)

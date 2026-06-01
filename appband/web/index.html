@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AppBand</title>
   <link rel="stylesheet" href="/static/style.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
-  <script src="/static/app.js" defer></script>
+  <script type="module" src="/static/app.js"></script>
 </head>
 <body>
 
@@ -19,47 +19,52 @@
 
     <div class="filters">
       <div class="filter-group">
-        <span class="filter-label">Aralık</span>
+        <span class="filter-label" data-i18n="filters.range.label">Range</span>
         <select id="range">
-          <option value="3600">Son saat</option>
-          <option value="86400" selected>Son 24 saat</option>
-          <option value="604800">Son 7 gün</option>
-          <option value="2592000">Son 30 gün</option>
+          <option value="3600" data-i18n="filters.range.last_hour">Last hour</option>
+          <option value="86400" selected data-i18n="filters.range.today">Today</option>
+          <option value="604800" data-i18n="filters.range.last_7d">Last 7 days</option>
+          <option value="2592000" data-i18n="filters.range.last_30d">Last 30 days</option>
         </select>
       </div>
 
       <div class="filter-group">
-        <span class="filter-label">Ağ</span>
+        <span class="filter-label" data-i18n="filters.network.label">Network</span>
         <select id="ssid">
-          <option value="">Tümü</option>
+          <option value="" data-i18n="filters.network.all">All</option>
         </select>
       </div>
 
       <div class="filter-group">
-        <span class="filter-label">Trafik</span>
+        <span class="filter-label" data-i18n="filters.scope.label">Traffic</span>
         <select id="scope">
-          <option value="internet" selected>İnternet</option>
-          <option value="lan">LAN</option>
-          <option value="all">Hepsi</option>
+          <option value="internet" selected data-i18n="filters.scope.internet">Internet</option>
+          <option value="lan" data-i18n="filters.scope.lan">LAN</option>
+          <option value="all" data-i18n="filters.scope.all">All</option>
         </select>
       </div>
 
       <button id="btn-refresh">
         <span class="refresh-icon">↻</span>
-        Yenile
+        <span data-i18n="filters.refresh">Refresh</span>
       </button>
+
+      <div class="lang-toggle" role="group" aria-label="Language">
+        <button data-lang="en" class="lang-btn">EN</button>
+        <button data-lang="tr" class="lang-btn">TR</button>
+      </div>
     </div>
   </header>
 
   <!-- ── Main content ───────────────────────────────────────────────────────── -->
   <main class="main-content">
 
-    <!-- Şu an ---------------------------------------------------------------- -->
+    <!-- Now ----------------------------------------------------------------- -->
     <section class="card card-live" id="panel-current">
       <div class="card-header">
         <div class="live-label">
           <span class="pulse-dot"></span>
-          Canlı
+          <span data-i18n="panel.current.live">Live</span>
         </div>
         <div id="live-network-badge"></div>
       </div>
@@ -78,16 +83,16 @@
       </div>
     </section>
 
-    <!-- Zaman Serisi --------------------------------------------------------- -->
+    <!-- Time Series ---------------------------------------------------------- -->
     <section class="card" id="panel-timeseries">
       <div class="card-header">
-        <span class="card-title">Zaman Serisi</span>
+        <span class="card-title" data-i18n="panel.timeseries.title">Time Series</span>
         <div class="legend-chips">
           <div class="legend-chip">
-            <span class="legend-dot" style="background:var(--download-color);"></span>İndirme
+            <span class="legend-dot" style="background:var(--download-color);"></span><span data-i18n="legend.download">Download</span>
           </div>
           <div class="legend-chip">
-            <span class="legend-dot" style="background:var(--upload-color);"></span>Yükleme
+            <span class="legend-dot" style="background:var(--upload-color);"></span><span data-i18n="legend.upload">Upload</span>
           </div>
         </div>
       </div>
@@ -96,12 +101,12 @@
       </div>
     </section>
 
-    <!-- Ağa göre + Uygulamaya göre (two-column) ------------------------------ -->
+    <!-- By Network + By App (two-column) ------------------------------------- -->
     <div class="card-row">
 
       <section class="card" id="panel-network">
         <div class="card-header">
-          <span class="card-title">Ağa göre</span>
+          <span class="card-title" data-i18n="panel.by_network.title">By Network</span>
         </div>
         <div id="network-body">
           <div class="skeleton-block" style="height:140px;"></div>
@@ -110,8 +115,8 @@
 
       <section class="card" id="panel-process">
         <div class="card-header">
-          <span class="card-title">Uygulamaya göre</span>
-          <span class="scope-badge" id="scope-badge-process">İnternet</span>
+          <span class="card-title" data-i18n="panel.by_process.title">By App</span>
+          <span class="scope-badge" id="scope-badge-process">Internet</span>
         </div>
         <div id="process-body">
           <div class="skeleton-block" style="height:200px;"></div>
@@ -120,11 +125,11 @@
 
     </div>
 
-    <!-- Domain'lere göre ----------------------------------------------------- -->
+    <!-- By Domain ------------------------------------------------------------ -->
     <section class="card" id="panel-domain">
       <div class="card-header">
-        <span class="card-title">Domain'lere göre</span>
-        <span class="scope-badge" id="scope-badge-domain">İnternet</span>
+        <span class="card-title" data-i18n="panel.by_domain.title">By Domain</span>
+        <span class="scope-badge" id="scope-badge-domain">Internet</span>
       </div>
       <div id="domain-body">
         <div class="skeleton-block" style="height:220px;"></div>

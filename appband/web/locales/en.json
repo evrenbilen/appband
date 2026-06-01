@@ -1,0 +1,53 @@
+{
+  "app.title": "AppBand",
+  "app.subtitle": "Per-App Bandwidth & Network Monitor",
+
+  "filters.range.label": "Range",
+  "filters.range.last_hour": "Last hour",
+  "filters.range.today": "Today",
+  "filters.range.last_7d": "Last 7 days",
+  "filters.range.last_30d": "Last 30 days",
+
+  "filters.network.label": "Network",
+  "filters.network.all": "All",
+
+  "filters.scope.label": "Traffic",
+  "filters.scope.internet": "Internet",
+  "filters.scope.lan": "LAN",
+  "filters.scope.all": "All",
+
+  "filters.refresh": "Refresh",
+  "filters.language": "Language",
+
+  "panel.current.title": "Now",
+  "panel.current.live": "Live",
+  "panel.current.offline": "No active network (offline)",
+  "panel.current.started": "Started",
+  "panel.current.ip": "IP",
+  "panel.timeseries.title": "Time Series",
+  "panel.by_network.title": "By Network",
+  "panel.by_process.title": "By App",
+  "panel.by_domain.title": "By Domain",
+  "panel.by_domain.note": "approximate",
+
+  "legend.download": "Download",
+  "legend.upload": "Upload",
+
+  "table.network": "Network",
+  "table.download": "↓ Download",
+  "table.upload": "↑ Upload",
+
+  "state.loading": "Loading…",
+  "state.empty": "No data in this range.",
+  "state.error": "Couldn't fetch data",
+  "state.retry": "Retry",
+
+  "chart.tooltip.approx_title": "{label} (approximate)",
+  "chart.tooltip.approx_body": "Approximate: process bytes distributed across connections.",
+
+  "link_type.wifi": "Wi-Fi",
+  "link_type.ethernet": "Ethernet",
+  "link_type.iphone_hotspot": "iPhone hotspot",
+  "link_type.usb_tether": "USB tether",
+  "link_type.unknown": "Unknown"
+}

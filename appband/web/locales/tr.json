@@ -1,0 +1,53 @@
+{
+  "app.title": "AppBand",
+  "app.subtitle": "Uygulama Bazında Bant Genişliği ve Ağ Monitörü",
+
+  "filters.range.label": "Aralık",
+  "filters.range.last_hour": "Son saat",
+  "filters.range.today": "Bugün",
+  "filters.range.last_7d": "Son 7 gün",
+  "filters.range.last_30d": "Son 30 gün",
+
+  "filters.network.label": "Ağ",
+  "filters.network.all": "Tümü",
+
+  "filters.scope.label": "Trafik",
+  "filters.scope.internet": "Internet",
+  "filters.scope.lan": "LAN",
+  "filters.scope.all": "Hepsi",
+
+  "filters.refresh": "Yenile",
+  "filters.language": "Dil",
+
+  "panel.current.title": "Şu an",
+  "panel.current.live": "Canlı",
+  "panel.current.offline": "Aktif ağ yok (çevrimdışı)",
+  "panel.current.started": "Başlangıç",
+  "panel.current.ip": "IP",
+  "panel.timeseries.title": "Zaman Serisi",
+  "panel.by_network.title": "Ağa göre",
+  "panel.by_process.title": "Uygulamaya göre",
+  "panel.by_domain.title": "Domain'lere göre",
+  "panel.by_domain.note": "yaklaşık",
+
+  "legend.download": "İndirme",
+  "legend.upload": "Yükleme",
+
+  "table.network": "Ağ",
+  "table.download": "↓ İndirme",
+  "table.upload": "↑ Yükleme",
+
+  "state.loading": "Yükleniyor…",
+  "state.empty": "Bu aralıkta veri yok.",
+  "state.error": "Veri alınamadı",
+  "state.retry": "Tekrar dene",
+
+  "chart.tooltip.approx_title": "{label} (yaklaşık)",
+  "chart.tooltip.approx_body": "Yaklaşık: süreç byte'ı bağlantılara dağıtıldı.",
+
+  "link_type.wifi": "Wi-Fi",
+  "link_type.ethernet": "Ethernet",
+  "link_type.iphone_hotspot": "iPhone hotspot",
+  "link_type.usb_tether": "USB tether",
+  "link_type.unknown": "Bilinmeyen"
+}

@@ -1,5 +1,7 @@
 "use strict";
 
+import { t, initI18n, setLocale, currentLocale, applyDom } from "/static/i18n.js";
+
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 const $ = (id) => document.getElementById(id);
 
@@ -26,24 +28,34 @@ const fmtMbps = (bytesPerSec) => {
 /**
  * Format a unix timestamp into a locale string.
  */
-const fmtTime = (ts) => new Date(ts * 1000).toLocaleString("tr-TR");
+const fmtTime = (ts) => new Date(ts * 1000).toLocaleString();
 
 /**
- * Format relative duration (seconds → "3s 12dk" etc).
+ * Format relative duration (seconds → "3s 12m" etc).
  */
 const fmtUptime = (startedAt) => {
   const secs = Math.floor(Date.now() / 1000) - startedAt;
   if (secs < 60) return `${secs}s`;
-  if (secs < 3600) return `${Math.floor(secs / 60)}dk ${secs % 60}s`;
+  if (secs < 3600) return `${Math.floor(secs / 60)}m ${secs % 60}s`;
   const h = Math.floor(secs / 3600);
   const m = Math.floor((secs % 3600) / 60);
-  return `${h}s ${m}dk`;
+  return `${h}h ${m}m`;
 };
 
 /**
  * Escape HTML to prevent injection.
  */
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+/**
+ * Map a raw link_type slug to a localized label.
+ */
+function linkTypeLabel(raw) {
+  const slug = (raw || "unknown").replaceAll("-", "_");
+  const key = `link_type.${slug}`;
+  const out = t(key);
+  return out === key ? (raw || "unknown") : out;
+}
 
 /* ─── State ──────────────────────────────────────────────────────────────── */
 const state = {
@@ -150,13 +162,13 @@ function makeOrUpdateChart(id, config) {
 
 /* ─── Panel rendering helpers ────────────────────────────────────────────── */
 
-function showEmpty(containerId, message = "Bu aralıkta veri yok.") {
+function showEmpty(containerId) {
   const el = $(containerId);
   if (!el) return;
   el.innerHTML = `
     <div class="empty-state">
       <div class="empty-icon">📭</div>
-      <div>${esc(message)}</div>
+      <div>${esc(t("state.empty"))}</div>
     </div>`;
 }
 
@@ -166,8 +178,8 @@ function showError(containerId, retryFn) {
   el.innerHTML = `
     <div class="error-state">
       <span class="error-icon">⚠</span>
-      <span>Veri alınamadı</span>
-      <button class="retry-link" id="retry-${containerId}">Tekrar dene</button>
+      <span>${esc(t("state.error"))}</span>
+      <button class="retry-link" id="retry-${containerId}">${esc(t("state.retry"))}</button>
     </div>`;
   const btn = $(`retry-${containerId}`);
   if (btn && retryFn) btn.addEventListener("click", retryFn);
@@ -196,8 +208,7 @@ function ensureCanvas(containerId, chartId, height) {
 
 /* ─── Scope badge sync ───────────────────────────────────────────────────── */
 function updateScopeBadges() {
-  const labels = { internet: "İnternet", lan: "LAN", all: "Hepsi" };
-  const label = labels[state.scope] || state.scope;
+  const label = t(`filters.scope.${state.scope}`) || state.scope;
   for (const id of ["scope-badge-process", "scope-badge-domain"]) {
     const el = $(id);
     if (el) el.textContent = label;
@@ -215,7 +226,7 @@ async function loadCurrent() {
       body.innerHTML = `
         <div class="offline-state">
           <span class="offline-dot"></span>
-          Aktif ağ yok — çevrimdışı.
+          ${esc(t("panel.current.offline"))}
         </div>`;
       const badge = $("live-network-badge");
       if (badge) badge.innerHTML = "";
@@ -225,7 +236,7 @@ async function loadCurrent() {
     const s = data.session;
     const dlMbps = fmtMbps(data.bytes_in_60s / 60);
     const ulMbps = fmtMbps(data.bytes_out_60s / 60);
-    const networkLabel = s.ssid || `(${s.link_type})`;
+    const networkLabel = s.ssid || `(${linkTypeLabel(s.link_type)})`;
 
     // Update badge in header
     const badge = $("live-network-badge");
@@ -236,23 +247,23 @@ async function loadCurrent() {
     body.innerHTML = `
       <div class="live-stats">
         <div class="live-stat">
-          <div class="live-stat-label"><span class="arrow arrow-down">↓</span> İndirme</div>
+          <div class="live-stat-label"><span class="arrow arrow-down">↓</span> ${esc(t("legend.download"))}</div>
           <div class="live-stat-value download">${esc(dlMbps)}<span class="live-stat-unit">Mbps</span></div>
         </div>
         <div class="live-divider"></div>
         <div class="live-stat">
-          <div class="live-stat-label"><span class="arrow arrow-up">↑</span> Yükleme</div>
+          <div class="live-stat-label"><span class="arrow arrow-up">↑</span> ${esc(t("legend.upload"))}</div>
           <div class="live-stat-value upload">${esc(ulMbps)}<span class="live-stat-unit">Mbps</span></div>
         </div>
       </div>
       <div class="live-metadata">
         ${s.ssid ? `<span class="meta-chip"><span class="meta-icon">📶</span>${esc(s.ssid)}</span>` : ""}
         <span class="meta-chip"><span class="meta-icon">🔌</span>${esc(s.interface)}</span>
-        <span class="meta-chip"><span class="meta-icon">🏷</span>${esc(s.link_type)}</span>
+        <span class="meta-chip"><span class="meta-icon">🏷</span>${esc(linkTypeLabel(s.link_type))}</span>
         ${s.ip_address ? `<span class="meta-chip"><span class="meta-icon">🌐</span>${esc(s.ip_address)}</span>` : ""}
         <span class="meta-chip">⏱ ${esc(fmtUptime(s.started_at))}</span>
       </div>
-      <div class="live-since">Bağlantı başlangıcı: ${esc(fmtTime(s.started_at))}</div>`;
+      <div class="live-since">${esc(t("panel.current.started"))}: ${esc(fmtTime(s.started_at))}</div>`;
   } catch (err) {
     showError("current-body", loadCurrent);
   }
@@ -268,7 +279,7 @@ async function loadSsidOptions() {
     const current = sel.value;
     while (sel.options.length > 1) sel.remove(1);
     for (const row of data.rows) {
-      const v = row.ssid || `(${row.link_type})`;
+      const v = row.ssid || `(${linkTypeLabel(row.link_type)})`;
       const opt = document.createElement("option");
       opt.value = v;
       opt.textContent = v;
@@ -299,8 +310,8 @@ async function loadTimeseries() {
     const labels = data.timeseries.map((r) => {
       const d = new Date(r.ts * 1000);
       return granularity === "day"
-        ? d.toLocaleDateString("tr-TR", { day: "numeric", month: "short" })
-        : d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+        ? d.toLocaleDateString(undefined, { day: "numeric", month: "short" })
+        : d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
     });
 
     makeOrUpdateChart("chart-timeseries", {
@@ -309,14 +320,14 @@ async function loadTimeseries() {
         labels,
         datasets: [
           {
-            label: "İndirme",
+            label: t("legend.download"),
             data: data.timeseries.map((r) => r.bytes_in),
             backgroundColor: "rgba(10, 132, 255, 0.85)",
             borderRadius: 4,
             borderSkipped: false,
           },
           {
-            label: "Yükleme",
+            label: t("legend.upload"),
             data: data.timeseries.map((r) => r.bytes_out),
             backgroundColor: "rgba(255, 149, 0, 0.85)",
             borderRadius: 4,
@@ -368,7 +379,7 @@ async function loadByNetwork() {
 
     ensureCanvas(containerId, "chart-network", undefined);
 
-    const labels = data.rows.map((r) => r.ssid || `(${r.link_type})`);
+    const labels = data.rows.map((r) => r.ssid || `(${linkTypeLabel(r.link_type)})`);
     const totals = data.rows.map((r) => r.bytes_in + r.bytes_out);
 
     makeOrUpdateChart("chart-network", {
@@ -422,15 +433,15 @@ async function loadByNetwork() {
         <table class="data-table">
           <thead>
             <tr>
-              <th>Ağ</th>
-              <th class="num">↓ İndirme</th>
-              <th class="num">↑ Yükleme</th>
+              <th>${esc(t("table.network"))}</th>
+              <th class="num">${esc(t("table.download"))}</th>
+              <th class="num">${esc(t("table.upload"))}</th>
             </tr>
           </thead>
           <tbody>
             ${data.rows.map((r) => `
               <tr>
-                <td>${esc(r.ssid || `(${r.link_type})`)}</td>
+                <td>${esc(r.ssid || `(${linkTypeLabel(r.link_type)})`)}</td>
                 <td class="num">${fmtBytes(r.bytes_in)}</td>
                 <td class="num">${fmtBytes(r.bytes_out)}</td>
               </tr>`).join("")}
@@ -465,14 +476,14 @@ async function loadByProcess() {
         labels,
         datasets: [
           {
-            label: "İndirme",
+            label: t("legend.download"),
             data: data.rows.map((r) => r.bytes_in),
             backgroundColor: "rgba(10, 132, 255, 0.85)",
             borderRadius: 3,
             borderSkipped: false,
           },
           {
-            label: "Yükleme",
+            label: t("legend.upload"),
             data: data.rows.map((r) => r.bytes_out),
             backgroundColor: "rgba(255, 149, 0, 0.85)",
             borderRadius: 3,
@@ -520,7 +531,7 @@ async function loadByDomain() {
 
     ensureCanvas(containerId, "chart-domain", 80);
 
-    // For labels we just use the host name (no "~" prefix — approximate is shown as badge in tooltip)
+    // For labels we just use the host name (approximate is shown in tooltip)
     const labels = data.rows.map((r) => r.host);
     const approxMap = new Map(data.rows.map((r) => [r.host, r.approximate]));
 
@@ -530,14 +541,14 @@ async function loadByDomain() {
         labels,
         datasets: [
           {
-            label: "İndirme",
+            label: t("legend.download"),
             data: data.rows.map((r) => r.bytes_in),
             backgroundColor: "rgba(10, 132, 255, 0.85)",
             borderRadius: 3,
             borderSkipped: false,
           },
           {
-            label: "Yükleme",
+            label: t("legend.upload"),
             data: data.rows.map((r) => r.bytes_out),
             backgroundColor: "rgba(255, 149, 0, 0.85)",
             borderRadius: 3,
@@ -553,13 +564,13 @@ async function loadByDomain() {
               title: (items) => {
                 const host = items[0]?.label ?? "";
                 const isApprox = approxMap.get(host);
-                return isApprox ? `${host}  ≈ yaklaşık` : host;
+                return isApprox ? t("chart.tooltip.approx_title", { label: host }) : host;
               },
               label: (c) => ` ${c.dataset.label}: ${fmtBytes(c.parsed.x)}`,
               afterBody: (items) => {
                 const host = items[0]?.label ?? "";
                 if (approxMap.get(host)) {
-                  return ["", "Yaklaşık: süreç byte'ı bağlantılara dağıtıldı."];
+                  return ["", t("chart.tooltip.approx_body")];
                 }
                 return [];
               },
@@ -626,6 +637,20 @@ window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () 
   refreshAll();
 });
 
+/* ─── Language toggle ────────────────────────────────────────────────────── */
+function bindLangToggle() {
+  document.querySelectorAll(".lang-btn").forEach((btn) => {
+    btn.addEventListener("click", () => setLocale(btn.dataset.lang));
+  });
+}
+
+function highlightActiveLang() {
+  const cur = currentLocale();
+  document.querySelectorAll(".lang-btn").forEach((btn) => {
+    btn.classList.toggle("lang-btn--active", btn.dataset.lang === cur);
+  });
+}
+
 /* ─── Event binding ──────────────────────────────────────────────────────── */
 function bind() {
   $("range").addEventListener("change", (e) => {
@@ -645,8 +670,18 @@ function bind() {
   $("btn-refresh").addEventListener("click", withRefreshSpinner(refreshAll));
 }
 
+/* ─── locale-changed: re-render JS-built content ────────────────────────── */
+window.addEventListener("locale-changed", () => {
+  highlightActiveLang();
+  // Re-render all panels so translated strings appear in charts/tables
+  refreshAll();
+});
+
 /* ─── Boot ───────────────────────────────────────────────────────────────── */
-window.addEventListener("DOMContentLoaded", () => {
+window.addEventListener("DOMContentLoaded", async () => {
+  await initI18n();
+  bindLangToggle();
+  highlightActiveLang();
   bind();
   refreshAll();
   setInterval(refreshFast, 5_000);
