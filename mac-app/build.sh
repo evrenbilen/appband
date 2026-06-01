@@ -27,7 +27,12 @@ fi
 echo "=== 3. Assemble .app bundle ==="
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/AppBand"
-cp "$HERE/Sources/AppBand/Info.plist" "$APP/Contents/Info.plist"
+# Single source of truth: inject appband.__version__ into Info.plist's
+# CFBundleShortVersionString (the source plist holds a __VERSION__ placeholder).
+VERSION="$(PYTHONPATH="$REPO" python3 -c "import appband; print(appband.__version__)")"
+[ -n "$VERSION" ] || { echo "could not read appband.__version__"; exit 1; }
+echo "version: $VERSION"
+sed "s|__VERSION__|$VERSION|g" "$HERE/Sources/AppBand/Info.plist" > "$APP/Contents/Info.plist"
 
 echo "=== 4. Bundle Python backend into Resources ==="
 mkdir -p "$APP/Contents/Resources/backend"

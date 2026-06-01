@@ -93,7 +93,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     fileprivate func showAbout() {
         popover.performClose(nil)
         let alert = NSAlert()
-        alert.messageText = "AppBand 0.1.3"
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? ""
+        alert.messageText = "AppBand \(version)"
         alert.informativeText = """
         Per-App Bandwidth & Network Monitor for macOS.
 
