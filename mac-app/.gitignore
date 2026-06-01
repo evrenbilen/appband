@@ -2,3 +2,4 @@
 AppBand.app/
 *.dmg
 .DS_Store
+AppBand-*.dmg
