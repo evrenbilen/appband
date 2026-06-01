@@ -16,6 +16,12 @@ from appband.config import load_config
 log = logging.getLogger("appband.server")
 WEB_ROOT = Path(__file__).parent / "web"
 
+# The frequent collector pollers that must ALL be reporting for a healthy
+# status — a present+fresh fast poller must not mask a dead slow one.
+EXPECTED_POLLERS = ("session", "iface", "proc", "conn")
+# A poller is stale after ~4 missed cycles of the slowest (conn = 30s) poller.
+HEARTBEAT_STALE_SEC = 120
+
 
 def _is_loopback_name(name: str | None) -> bool:
     """True if a hostname refers to the local machine (127.0.0.0/8, ::1, localhost)."""
@@ -161,15 +167,17 @@ def build_handler(db_path: Path) -> type:
 
         def _health(self, conn: sqlite3.Connection, now: int) -> dict:
             from appband.db import get_health
-            # Age (seconds) since each frequent poller last reported success.
-            pollers = {p: now - ts for p, ts in get_health(conn).items()}
-            if not pollers:
-                status = "down"          # collector never ran / dead
-            elif max(pollers.values()) > 120:
-                status = "degraded"      # a poller has gone stale
+            raw = get_health(conn)
+            # Age (seconds) since each poller last reported success.
+            pollers = {p: now - ts for p, ts in raw.items()}
+            missing = [p for p in EXPECTED_POLLERS if p not in raw]
+            if not raw:
+                status = "down"                       # collector never ran / dead
+            elif missing or max(pollers.values()) > HEARTBEAT_STALE_SEC:
+                status = "degraded"                   # a poller is missing or stale
             else:
                 status = "ok"
-            return {"status": status, "pollers": pollers}
+            return {"status": status, "pollers": pollers, "missing": missing}
 
         def _current(self, conn: sqlite3.Connection, now: int) -> dict:
             cur = conn.execute(

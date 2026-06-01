@@ -108,8 +108,15 @@ def connect(db_path: Path) -> sqlite3.Connection:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = _open(db_path)
     try:
-        # quick_check is fast and raises/returns non-"ok" on a corrupt or
-        # non-SQLite file; either way we quarantine and recreate.
+        # quick_check is fast and raises (DatabaseError) or returns non-"ok" on
+        # a malformed/non-SQLite *main* file. A 0-byte file is a valid empty DB
+        # ("ok") and is just initialized below.
+        # Limitation: quick_check reads only the main file, so a corrupt -wal/
+        # -shm sidecar on an otherwise-healthy DB is not caught here — and can't
+        # be auto-quarantined safely, since it can surface as OperationalError,
+        # indistinguishable from normal multi-process write contention (which
+        # must NOT be quarantined). WAL corruption that does raise DatabaseError
+        # IS quarantined (the sidecars are renamed too).
         if conn.execute("PRAGMA quick_check").fetchone()[0] != "ok":
             raise sqlite3.DatabaseError("quick_check failed")
         init_schema(conn)

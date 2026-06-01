@@ -80,6 +80,20 @@ class CorruptDbTest(unittest.TestCase):
             connect(db_path).close()      # reopen — must not quarantine
             self.assertEqual(list(Path(tmp).glob("appband.db.corrupt-*")), [])
 
+    def test_empty_db_is_not_quarantined(self):
+        # A 0-byte file is a valid empty SQLite DB (quick_check returns "ok"),
+        # not corruption — it should be initialized, not quarantined.
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "appband.db"
+            db_path.touch()
+            conn = connect(db_path)
+            tables = {r[0] for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table'"
+            )}
+            conn.close()
+            self.assertIn("sessions", tables)
+            self.assertEqual(list(Path(tmp).glob("appband.db.corrupt-*")), [])
+
 
 if __name__ == "__main__":
     unittest.main()

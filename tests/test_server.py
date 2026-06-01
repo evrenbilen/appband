@@ -230,6 +230,16 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(body["status"], "ok")
         self.assertIn("iface", body["pollers"])
+        self.assertEqual(body["missing"], [])
+
+    def test_api_health_degraded_when_a_poller_is_missing(self):
+        # A present+fresh fast poller must not mask dead slow pollers.
+        now = int(time.time())
+        self._seed_health(session=now - 3, iface=now - 4)  # proc + conn never reported
+        _, body = self._get("/api/health")
+        self.assertEqual(body["status"], "degraded")
+        self.assertIn("proc", body["missing"])
+        self.assertIn("conn", body["missing"])
 
     def test_api_health_degraded_when_stale(self):
         self._seed_health(iface=int(time.time()) - 9999)
