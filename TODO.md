@@ -1,0 +1,154 @@
+# AppBand — Backlog / TODO
+
+Bu dosya AppBand'in yapılacaklar listesidir: epic'ler ve alt görevler, önceliklerine göre
+sıralanmış. İçerik, kod tabanı üzerinde yürütülen çok-ajanlı bir inceleme + adversaryal
+tamlık kritiği sonucunda üretildi; her madde gerçek kod davranışına dayanıyor.
+
+## Nasıl okunur
+
+- **Öncelik katmanları:** `P0` (şimdi / temel) → `P1` (sonraki / doğruluk) → `P2` (içgörü, performans) → `P3` (büyük bahisler, dağıtım).
+- **Efor:** `S` (saatler) · `M` (gün(ler)) · `L` (hafta(lar) / yeniden yazım).
+- **Etki:** `high` / `med` / `low`.
+- `- [ ]` açık · `- [x]` tamamlandı.
+- Parantez içindeki dosyalar dokunulacak ana yerlerdir.
+
+> **Sıralama ilkesi (kritikten):** Ürünün asıl işi — "şu an bağlantımı ne yiyor, uygulama
+> bazında?" — bugün hiçbir yerde *canlı ve tam* sunulmuyor; oysa veri (`process_samples`,
+> `interface_samples`) zaten tam ve 5–10 sn'de toplanıyor. Bu yüzden **canlı per-app döngüsü**
+> ve **dakika çözünürlüğü**, güvenlik üçlüsüyle birlikte P0'da. L-eforlu per-connection yeniden
+> yazımı ve rollup tabloları, ihtiyaç kanıtlanana kadar P3'te bekletildi.
+
+---
+
+## P0 — Temel + en yüksek kaldıraç (önce bunlar)
+
+### [x] EPIC P0-A: Yerel yüzeyin güvenlik sıkılaştırması  ·  **TAMAMLANDI** (83 test geçiyor)
+Ürünün tüm vaadi yerel gizlilik; ama kimlik-doğrulamasız API tüm ağ geçmişini döndürüyor ve
+dashboard public CDN'e gidiyor. Yeni hiçbir hassas endpoint bu kapı inmeden eklenmemeli.
+- [x] Host/Origin header doğrulaması → DNS-rebinding ve cross-origin okumayı 403 ile engelle (S, high) (`appband/server.py`, `tests/test_server.py`)
+- [x] Chart.js'i `appband/web/vendor/`'a vendor'la + `/static/` üzerinden sun (chart.js@4.4.0, sha256 `0e2326…abff0`) (S, high) (`appband/web/index.html`)
+- [x] Sıkı CSP + `X-Content-Type-Options: nosniff` + `Referrer-Policy: no-referrer` header'ları (S, high) (`appband/server.py`)
+- [x] `load_config` içinde `bind_host`'u loopback'e kıs (`ipaddress.is_loopback`); non-loopback → uyarı + `127.0.0.1`'e geri dön (S, high) (`appband/config.py`, `tests/test_config.py`)
+- [x] DB dosya izinlerini `0600` yap + at-rest şifrelemenin olmadığını dürüstçe belgele (S, med) (`appband/db.py`, README Privacy)
+
+### [ ] EPIC P0-B: Canlı "şu an" per-app döngüsü + dakika çözünürlüğü  ·  **ürünün manşeti**
+Veri zaten tam (`scope=all` → `approximate:false`); backend sadece canlı/ince sunmuyor.
+- [ ] `/api/current`'a son ~60 sn'de **tam** ilk-N uygulamayı ekle (M, high) (`appband/server.py`)
+- [ ] `query_timeseries`'e `minute` (ham ~5–10 sn) granülaritesi ekle (M, high) (`appband/db.py`, `appband/server.py`)
+- [ ] Dashboard'a canlı ticker + ince çözünürlüklü throughput grafiği (M, high) (`appband/web/app.js`, `index.html`)
+- [ ] Popover'da `/api/by-process?scope=all` ile tam uygulama kırılımı (M, high) (`mac-app/Sources/AppBand/NetworkMonitor.swift`, `LivePopover.swift`)
+- [ ] **Kapsama göstergesi:** toplam (interface) vs atfedilen (process) farkını yüzde olarak göster — "%82 atfedildi" (M, high) (`appband/server.py`, `appband/web/app.js`)
+
+### [ ] EPIC P0-C: CI + sürüm tek-kaynak
+- [ ] GitHub Actions CI: macOS runner'da `unittest` + `swift build` (S, high) (`.github/workflows/ci.yml`)
+- [ ] Tek-kaynak `VERSION` dosyası → Info.plist + README + backend `__version__` besler (S, high) (`mac-app/build.sh`, `appband/__init__.py`, README)
+- [ ] About kutusundaki sabit `0.1.3`'ü `CFBundleShortVersionString` okuyarak düzelt (S, low — doğrulanmış bug) (`mac-app/Sources/AppBand/AppBandApp.swift`)
+- [ ] Güncellemede backend'in yeniden kopyalanması: `installIfNeeded` sürüm karşılaştırsın (M, high — eski backend sonsuza dek çalışıyor) (`mac-app/Sources/AppBand/BackendInstaller.swift`)
+
+---
+
+## P1 — Güvenilirlik + çekirdek UX doğruluğu
+
+### [ ] EPIC P1-A: İki daemon'un kendini-iyileştirmesi
+- [ ] DB bozulması tespiti (`PRAGMA quick_check`) + karantina-ve-yeniden-oluştur → launchd crash döngüsünü kır (M, high) (`appband/db.py`, `tests/test_db.py`)
+- [ ] Heartbeat tablosu + `/api/health` (IPC'siz mimariye uygun tek liveness kanalı) (M, high) (`appband/db.py`, `appband/collector.py`, `appband/server.py`, `scripts/status.sh`)
+- [ ] Günlük bloklayan `VACUUM` yerine periyodik `wal_checkpoint(TRUNCATE)` + boyut-eşikli vacuum (M, med) (`appband/retention.py`, `appband/collector.py`)
+- [ ] `RotatingFileHandler`'a geç (her iki daemon, sınırsız log büyümesi) (S, med) (`appband/collector.py`, `appband/server.py`)
+- [ ] Thread supervisor: worker'ları daemon yap + ölen poller'ı yeniden başlat (M, med) (`appband/collector.py`)
+- [ ] Açıkta kalan oturumları başlangıçta kapat + yetim örnekleri purge et (30-gün retention sızıntısı) (M, med) (`appband/collector.py`, `appband/retention.py`)
+- [ ] `_run`: araç-eksik (FileNotFoundError) ile timeout/failure'ı ayır, tek-sefer logla, health'e yansıt (M, med) (`appband/collector.py`, `appband/session_watcher.py`)
+- [ ] Collector öz-metrikleri: düşen tick, izlenen anahtar sayısı, DNS kuyruk derinliği (M, med) (`appband/delta.py`, `appband/dns_cache.py`, `appband/server.py`)
+
+### [ ] EPIC P1-B: Mac uygulaması — hata görünürlüğü, kurtarma, kalıcılık
+- [ ] Yutulan `BackendInstaller` hatasını NSAlert ile göster (S, high — doğrulanmış) (`mac-app/Sources/AppBand/AppBandApp.swift`, `BackendInstaller.swift`)
+- [ ] "connecting" vs "offline" ayrımı + tek-tık **Restart Services** (`launchctl kickstart`) (M, high) (`NetworkMonitor.swift`, `LivePopover.swift`)
+- [ ] SMAppService ile "Girişte Başlat" toggle'ı (macOS 13 hedefi tam minimum) (M, med) (`LivePopover.swift`, `AppBandApp.swift`)
+- [ ] Uygulama-içi Uninstall akışı (`uninstall.sh --purge`'ü Process ile çağır) (M, med) (`AppBandApp.swift`, `BackendInstaller.swift`)
+- [ ] 1Hz başlık timer'ını 5 sn'lik monitor refresh'e birleştir (S, low — idle güç) (`AppBandApp.swift`, `NetworkMonitor.swift`)
+
+### [ ] EPIC P1-C: Dashboard doğruluğu + dürüstlüğü
+- [ ] Ölü SSID filtresini bağla (`state.ssid` hiçbir fetch'e eklenmiyor) **+ `process_samples`/`connections` için `session_id` index'i** (M, high) (`appband/web/app.js`, `appband/server.py`, `appband/db.py`, `tests/test_server.py`)
+- [ ] Yaklaşıklık rozetini görünür yap + "Nasıl okunur?" FAQ popover'ı (CSS/i18n zaten var, kullanılmıyor) (S, high) (`appband/web/index.html`, `app.js`, `style.css`)
+- [ ] Bilgi-mimarisi: tam yüzeyleri (toplam, uygulama, ağ) öne çıkar; tek yaklaşık panel olan by-domain'i ikincil + etiketli yap (M, high) (`appband/web/index.html`, `app.js`)
+- [ ] Kullanılmayan `/api/sessions`'tan "Ziyaret edilen ağlar" görünümü (M, med) (`appband/web/index.html`, `app.js`, `locales/*.json`)
+- [ ] By App / By Domain listelerine client-side arama + "tümünü göster" (15'lik tavan) (M, med) (`appband/web/app.js`, `index.html`, `style.css`)
+- [ ] 4 sabit ön-ayar dışında özel tarih-aralığı seçici (her endpoint zaten `from/to` alıyor) (M, med) (`appband/web/index.html`, `app.js`)
+- [ ] By App / By Domain / By Network için CSV dışa-aktarma (client-side, upload yok) (S, med) (`appband/web/app.js`)
+
+---
+
+## P2 — İçgörü + performans + veri doğruluğu
+
+### [ ] EPIC P2-A: İçgörü + sayaçlı-ağ uyarıları (bildirim katmanı = menü çubuğu app'i)
+- [ ] iphone-hotspot/usb-tether geçişinde sayaçlı-ağ uyarısı (S, high — en düşük efor, hotspot senaryosu) (`NetworkMonitor.swift`)
+- [ ] Sürekli yüksek-throughput canlı uyarısı ("hotspot'unu bir şey hızla tüketiyor") (M, med) (`NetworkMonitor.swift`)
+- [ ] Veri-kullanım bütçesi: `/api/budget` değerlendirme endpoint'i + macOS UserNotifications (L, high — `interface_samples` tam) (`appband/server.py`, mac-app)
+- [ ] "Ben uyurken internete ne konuştu?" gece/uzakta raporu (M, med) (`appband/server.py`, mac-app)
+- [ ] Günlük/haftalık özet digest'i (`/api/summary` + bildirim + dashboard kartı) (M, med)
+- [ ] Öğrenilmiş (process, host) allowlist'ine karşı beklenmedik-hedef uyarısı (L, med)
+- [ ] Process-başına anomali tespiti: kendi yuvarlanan baseline'ına göre "aniden konuşkan" (L, med)
+
+### [ ] EPIC P2-B: Retention ölçeğinde sorgu performansı
+- [ ] `connections`'ı yazma-anında dedup et: `UNIQUE(session, process, ip, port, bucket)` + `INSERT OR IGNORE` (M, high — ~9x fazlalık) (`appband/collector.py`, `appband/db.py`)
+- [ ] Composite index: `connections(process_name, ts)` + `process_samples(process_name, ts)` (S, high) (`appband/db.py`)
+- [ ] `connections(session_id)` + `dns_cache(resolved_at)` index'leri (purge/DNS taramalarını kapsa) (S, med) (`appband/db.py`)
+- [ ] SQLite PRAGMA'lar: `mmap_size`, `cache_size`, `temp_store=MEMORY`, `synchronous=NORMAL` (S, med) (`appband/db.py`, `appband/collector.py`, `appband/server.py`)
+- [ ] Pahalı yaklaşık endpoint'ler için kısa-TTL in-process response cache (S, med) (`appband/server.py`)
+- [ ] API endpoint'lerine pagination/limit koruması + zaman-penceresi tavanı (S, med) (`appband/server.py`)
+
+### [ ] EPIC P2-C: Veri-modeli doğruluğu (yakalanan-ama-kullanılmayan alanlar)
+- [ ] VPN/tunnel oturumlarını tespit + etiketle (`utun/ipsec/ppp` → `ethernet` yanlış) (S, med) (`appband/parsers/network_info.py`, `session_watcher.py`)
+- [ ] IPv6 LAN/dışlama sınıflandırmasını düzelt: zone-id (`%en0`) sıyır, bracketless IPv6 ayrıştır (S, med) (`appband/parsers/lsof.py`, `tests/fixtures/lsof_ipv6.txt`)
+- [ ] Uyku/uyanma ve offline boşluklarını kaydet (`gaps` tablosu) → "izlemiyorduk" vs "gerçekten 0" (M, med) (`appband/collector.py`, `appband/db.py`, `appband/delta.py`)
+- [ ] PID → app bundle id + görünen ad (`plistlib`, stdlib) ile kararlı per-app gruplama (M, med) (`appband/parsers/proc_info.py`, `collector.py`, `db.py`)
+- [ ] Port/protokol kırılımı: saklanan ama okunmayan alanlardan `/api/by-port` (S, low) (`appband/server.py`)
+
+### [ ] EPIC P2-D: Test derinliği
+- [ ] Yaklaşık by-domain/by-process dağıtım matematiğini bilinen byte değerleriyle test et (M, high) (`tests/test_server_approximation.py`)
+- [ ] Parser testlerini `tests/fixtures/`'taki gerçek yakalamalardan sür (30KB lsof hiç parse edilmiyor) (S, med) (`tests/test_parsers_*.py`)
+- [ ] `_run` subprocess-failure yolu + `collect_snapshot` happy-path kapsaması (S, med) (`tests/test_collector_smoke.py`, `test_session_watcher.py`)
+- [ ] CI'a `shellcheck` + plist-render + `plutil -lint` (S, med) (`.github/workflows/ci.yml`)
+- [ ] Locale anahtar-paritesi unittest'i (eksik çeviriyi yakala) (S, low) (`tests/`)
+- [ ] Server testlerindeki ResourceWarning'leri sustur + stray `.pytest_cache`'i temizle (S, low) (`tests/test_server.py`)
+- [ ] Atıl `netstat` parser'ını ya bağla ya sil (test kapsamasını şişiriyor) (S, low) (`appband/parsers/netstat.py`)
+
+---
+
+## P3 — Büyük bahisler + dağıtım (bilinçli sırala)
+
+### [ ] EPIC P3-A: Gerçek per-connection byte muhasebesi  ·  **ihtiyaç kanıtlanmadan başlama**
+> ⚠️ Yaklaşıklığı tamamen kaldırır ama: (1) proje zaten iPhone-hotspot kernel sayaç hatasından
+> kaçmak için `nettop -m route` kullanıyor; ham per-socket sayaç tam o riski geri getirir.
+> (2) Canlı-tam-app görünümü (P0-B) gerçek senaryonun çoğunu zaten karşılıyor.
+- [ ] Önce P0-B'yi çıkar ve kullanıcının host-bazlı byte atıfına ihtiyacını kanıtla
+- [ ] `nettop` (`-P` olmadan) per-socket çıktısını parse eden bağlantı-detayı parser'ı + fixture (M, high) (`appband/parsers/nettop.py`)
+- [ ] Per-connection `DeltaTracker` + yeni `connection_samples` tablosu (L, high) (`appband/collector.py`, `appband/db.py`)
+- [ ] by-domain/by-process'i gerçek byte'lara taşı, `approximate` bayrağını kaldır (L, high) (`appband/server.py`)
+- [ ] (Opsiyonel) nettop TCP sağlık sütunları (`rtt_avg`, `re-tx`) → bağlantı-kalitesi sinyali (M, low)
+
+### [ ] EPIC P3-B: 5-dk rollup tabloları  ·  dedup+index+cache yetersiz ölçülürse
+- [ ] Önce P2-B'yi ölç; ancak yetersizse rollup'a geç (L, high) (`appband/collector.py`, `appband/db.py`, `appband/server.py`)
+
+### [ ] EPIC P3-C: Release engineering + dağıtım
+- [ ] Tag ile tetiklenen release workflow: build + sign + DMG + checksum + `gh release create` (M, high — CI'a bağlı) (`.github/workflows/release.yml`)
+- [ ] README'nin vaat ettiği SHA-256 manifestini gerçekten yayınla (S, high) (release workflow)
+- [ ] Commit'lenmiş DMG'leri + 26MB scratch image'i sil ve gitignore'la (S, med) (`.gitignore`, `mac-app/`)
+- [ ] Notarization plumbing'i env-credential'ların arkasında ekle (ad-hoc fallback bozulmadan) (M, — ücretli Apple hesabı gerekir) (`mac-app/build-dmg.sh`)
+- [ ] Homebrew cask (ayrı tap repo, yayınlanmış SHA + Release URL'lerine bağlı) (M, high)
+- [ ] GitHub Releases API'sine karşı "güncelleme var" kontrolü (uygulamanın tek dış çağrısı → opt-in + README'de belgele) (M, med) (mac-app)
+
+### [ ] EPIC P3-D: Dokümanlar + onboarding
+- [ ] `CHANGELOG.md` (v0.1.0–v0.1.4 tag'lerinden) (S, med)
+- [ ] Mimari dokümanı + diyagram → bkz. `docs/ARCHITECTURE.md` (S, med) ✅ *başlatıldı*
+- [ ] Dört shell script'e `--help`/usage çıktısı (S, med) (`scripts/*.sh`)
+- [ ] Dashboard'a ilk-çalıştırma onboarding overlay'i (P1-C bilgi-mimarisi indikten *sonra*) (M, med) (`appband/web/`)
+- [ ] Mac uygulamasının menü/About'unu yerelleştir veya "İngilizce-only" olduğunu belgele (S, low)
+
+---
+
+## Kısıt notları (ihlal değil — incelemede dikkat)
+
+- **Chart.js vendor'lama** ve **mac-app güncelleme kontrolü** "no deps / localhost-only" kurallarını ihlal etmez (kural Python *server* bind'i için; Swift app ayrı). Yine de güncelleme kontrolünü opt-in yap ve README Privacy'de belgele.
+- **Şema değişiklikleri additive-only** + her biri `_ensure_column` ile kayıtlı olmalı (migration framework yok; `SCHEMA`'yı değiştirmek mevcut DB'leri güncellemez).
+- **Tüm yıkıcı/hassas endpoint'ler** (purge / forget / export / budget) Host/Origin kapısının (P0-A) arkasında olmalı — bu yüzden o kapı birinci.
+- **Bildirimler** yalnızca menü çubuğu app'inden gelmeli, başsız LaunchAgent'lardan değil.
