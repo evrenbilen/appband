@@ -15,14 +15,20 @@ final class NetworkMonitor: ObservableObject {
         let bytes: Double   // exact total (in + out) over the last 60s
     }
 
+    // A single missed poll during startup/restart is "connecting", not the
+    // alarming "offline" — only sustained failure (>= 2) means the backend is down.
+    enum ConnState { case connecting, online, offline }
+
     @Published var menuBarTitle: String = "↓ — ↑ —"
     @Published var mbpsIn: Double = 0
     @Published var mbpsOut: Double = 0
     @Published var session: Session? = nil
     @Published var topApps: [TopApp] = []
+    @Published var state: ConnState = .connecting
     @Published var isOnline: Bool = false
 
     private var timer: Timer?
+    private var failureCount = 0
 
     init() {
         Task { await refresh() }
@@ -47,6 +53,8 @@ final class NetworkMonitor: ObservableObject {
             self.mbpsIn = mIn
             self.mbpsOut = mOut
             self.menuBarTitle = String(format: "↓ %.1f ↑ %.1f", mIn, mOut)
+            self.failureCount = 0
+            self.state = .online
             self.isOnline = true
 
             if let s = json["session"] as? [String: Any] {
@@ -71,12 +79,29 @@ final class NetworkMonitor: ObservableObject {
                 self.topApps = []
             }
         } catch {
-            self.menuBarTitle = "⚠ offline"
+            self.failureCount += 1
+            self.state = self.failureCount >= 2 ? .offline : .connecting
+            self.menuBarTitle = self.state == .offline ? "⚠ offline" : "↓ … ↑ …"
             self.mbpsIn = 0
             self.mbpsOut = 0
             self.isOnline = false
             self.session = nil
             self.topApps = []
         }
+    }
+
+    /// Restart the background LaunchAgents (recovery when the backend has died).
+    /// kickstart -k re-runs an already-bootstrapped service.
+    func restartServices() {
+        let uid = getuid()
+        for label in ["dev.appband.collector", "dev.appband.server"] {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+            p.arguments = ["kickstart", "-k", "gui/\(uid)/\(label)"]
+            try? p.run()
+        }
+        self.failureCount = 0
+        self.state = .connecting
+        Task { await refresh() }
     }
 }

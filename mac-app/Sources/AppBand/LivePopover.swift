@@ -17,6 +17,12 @@ struct LivePopover: View {
                 Divider()
                 topAppsSection
             }
+            if monitor.state == .offline {
+                Divider()
+                menuRow(title: "Restart Services", systemImage: "arrow.clockwise", shortcut: nil) {
+                    monitor.restartServices()
+                }
+            }
             Divider()
             menuRow(title: "Open Dashboard", systemImage: "safari", shortcut: "D", action: openDashboard)
             menuRow(title: "About AppBand", systemImage: "info.circle", shortcut: nil, action: showAbout)
@@ -33,12 +39,28 @@ struct LivePopover: View {
 
     private var liveHeader: some View {
         HStack(spacing: 6) {
-            PulseDot(color: monitor.isOnline ? .green : .gray)
-            Text(monitor.isOnline ? "LIVE" : "OFFLINE")
+            PulseDot(color: stateColor)
+            Text(stateLabel)
                 .font(.system(size: 11, weight: .bold))
                 .foregroundStyle(.secondary)
                 .kerning(0.6)
             Spacer()
+        }
+    }
+
+    private var stateColor: Color {
+        switch monitor.state {
+        case .online:     return .green
+        case .connecting: return .yellow
+        case .offline:    return .gray
+        }
+    }
+
+    private var stateLabel: String {
+        switch monitor.state {
+        case .online:     return "LIVE"
+        case .connecting: return "CONNECTING…"
+        case .offline:    return "OFFLINE"
         }
     }
 

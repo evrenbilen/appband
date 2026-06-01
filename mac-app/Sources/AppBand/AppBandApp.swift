@@ -23,7 +23,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             try BackendInstaller.installIfNeeded()
         } catch {
-            // Surfaced via About sheet later; deliberately silent here
+            // Surface the failure instead of leaving the menu bar "offline"
+            // forever with no cause shown.
+            let detail: String
+            if case let InstallerError.installFailed(out) = error, !out.isEmpty {
+                detail = out
+            } else {
+                detail = String(describing: error)
+            }
+            let alert = NSAlert()
+            alert.messageText = "AppBand backend failed to install"
+            alert.informativeText = detail
+            alert.alertStyle = .warning
+            alert.runModal()
         }
 
         // 2. The shared network monitor
