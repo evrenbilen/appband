@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import Combine
+import UserNotifications
 
 @main
 struct AppBandApp: App {
@@ -39,7 +40,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             alert.runModal()
         }
 
-        // 2. The shared network monitor
+        // 2. The shared network monitor (+ ask once for notification permission,
+        //    used for the metered-network alert).
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         monitor = NetworkMonitor()
 
         // 3. Status item — variable length so title can grow

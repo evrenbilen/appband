@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import UserNotifications
 
 @MainActor
 final class NetworkMonitor: ObservableObject {
@@ -29,6 +30,8 @@ final class NetworkMonitor: ObservableObject {
     private var timer: Timer?
     private var failureCount = 0
     private var isRestarting = false
+    private var lastLinkType: String?
+    private static let meteredTypes: Set<String> = ["iphone-hotspot", "usb-tether"]
 
     init() {
         Task { await refresh() }
@@ -65,6 +68,7 @@ final class NetworkMonitor: ObservableObject {
             } else {
                 self.session = nil
             }
+            self.checkMeteredTransition(self.session?.linkType)
 
             // Exact per-app usage over the last 60s (no approximation).
             if let apps = json["top_apps"] as? [[String: Any]] {
@@ -109,5 +113,21 @@ final class NetworkMonitor: ObservableObject {
             await refresh()
             isRestarting = false
         }
+    }
+
+    /// Notify once when the active network transitions INTO a metered link
+    /// (iPhone hotspot / USB tether) from a non-metered one — the README's
+    /// headline use case. No alert on launch or while staying on the link.
+    private func checkMeteredTransition(_ newType: String?) {
+        defer { lastLinkType = newType }
+        guard let nt = newType, Self.meteredTypes.contains(nt),
+              let lt = lastLinkType, !Self.meteredTypes.contains(lt) else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "Metered network"
+        content.body = nt == "iphone-hotspot"
+            ? "You're on an iPhone hotspot — AppBand is tracking your data use."
+            : "You're on a USB tether — AppBand is tracking your data use."
+        let req = UNNotificationRequest(identifier: "appband.metered", content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(req)
     }
 }
