@@ -164,8 +164,8 @@ misses, so the tracker's memory doesn't grow unbounded.
 
 A "session" is a contiguous period on one network **identity**: `(interface, link_type, ssid,
 bssid)`. `collect_snapshot()` runs `route -n get default` → `ipconfig getsummary` → `ifconfig`,
-then `classify_link_type()` maps the result to one of `wifi` / `iphone-hotspot` / `usb-tether` /
-`ethernet`.
+then `classify_link_type()` maps the result to one of `vpn` (a `utun`/`ipsec`/`ppp` default route
+takes precedence) / `wifi` / `iphone-hotspot` / `usb-tether` / `ethernet`.
 
 `SessionWatcher.tick()` reconciles the live snapshot against the DB:
 
@@ -186,12 +186,27 @@ A localhost `ThreadingHTTPServer` that **opens a fresh read connection per reque
 stateless, and safe under WAL's many-readers model). It serves:
 
 - the static dashboard from `appband/web/` (via `_static`), and
-- a JSON API: `/api/current`, `/api/sessions`, `/api/timeseries`, `/api/by-network`,
-  `/api/by-process`, `/api/by-domain`.
+- a JSON API: `/api/current` (now also returns `top_apps` — top 5 processes in the last 60s,
+  exact — and `coverage`: total vs process-attributed bytes + pct), `/api/sessions`,
+  `/api/timeseries` (supports a `granularity` of `minute`/`hour`/`day`), `/api/by-network`,
+  `/api/by-process`, `/api/by-domain`, `/api/by-port` (port→service breakdown),
+  `/api/health` (collector heartbeat: `status` ok/degraded/down + per-poller ages + `missing`),
+  `/api/gaps` (collection-gap windows), and `/api/version`.
+
+Most analytics endpoints (`/api/timeseries`, `/api/by-process`, `/api/by-domain`, `/api/by-port`)
+accept an optional `ssid` (or `link_type`, for SSID-less networks like Ethernet) query param that
+scopes results to one network via a `JOIN sessions`.
 
 **Why a fresh connection per request?** No connection pool to manage (stdlib has none), no
 thread-affinity concerns, and request volume is tiny (a single local dashboard polling every few
 seconds). Correctness beats micro-optimization here.
+
+**Local-surface hardening (P0-A).** The whole product premise is local privacy, so the server:
+validates the `Host` (and any `Origin`) header against loopback to block DNS-rebinding /
+cross-origin reads of the unauthenticated API (403 otherwise); sends a strict
+Content-Security-Policy + `nosniff` + `no-referrer` on every response and **self-hosts Chart.js**
+under `/static/vendor/` (zero external requests); and `load_config` clamps a non-loopback
+`bind_host` back to `127.0.0.1`. The DB file is created `0600` (owner-only; not encrypted).
 
 ---
 
@@ -237,7 +252,9 @@ semaphore, times out individual lookups, and caches results persistently with a 
 
 ## 9. Schema & migrations — `appband/db.py`
 
-Tables: `sessions`, `interface_samples`, `process_samples`, `connections`, `dns_cache`.
+Tables: `sessions`, `interface_samples`, `process_samples`, `connections`, `dns_cache`,
+`collector_health` (per-poller `last_ok_ts` heartbeat behind `/api/health`), and `gaps`
+(`start_ts`/`end_ts` suspension windows behind `/api/gaps`).
 `init_schema` runs `CREATE TABLE IF NOT EXISTS …`, enables WAL + foreign keys.
 
 **There is no migration framework.** Schema changes are **additive only**, applied via the
@@ -275,14 +292,20 @@ routes churn (handled by `DeltaTracker` as a re-anchor).
 
 ## 11. Retention — `appband/retention.py`
 
-A daily thread runs `purge_old` (deletes `interface_samples`/`process_samples`/`connections`
-older than `retention_days` = 30; `dns_cache` older than `dns_cache_retention_days` = 90; and
-*ended* sessions older than the sample cutoff) followed by `VACUUM`.
+The retention thread runs `purge_old` daily (deletes `interface_samples`/`process_samples`/
+`connections`/`gaps` older than `retention_days` = 30; `dns_cache` older than
+`dns_cache_retention_days` = 90; and *ended* sessions older than the sample cutoff) plus `VACUUM`,
+and runs `wal_checkpoint(TRUNCATE)` **hourly** so the WAL can't grow unbounded between purges.
 
-Known sharp edges (on the backlog): the daily blocking `VACUUM` contends with the per-request read
-connections, the WAL is never explicitly checkpointed between runs, and a session left with
-`ended_at IS NULL` (unclean shutdown) is never purged — silently retaining its samples past 30
-days.
+Related self-healing (no longer "sharp edges"):
+- **Unclean shutdown:** at startup `close_orphan_sessions` closes every still-open session except
+  the most recent (which `SessionWatcher` re-adopts), so a SIGKILL no longer leaks sessions +
+  samples past retention.
+- **DB corruption:** `connect()` runs `PRAGMA quick_check`; a corrupt/non-SQLite main file is
+  renamed aside (`appband.db.corrupt-<ts>`, with `-wal`/`-shm`) and a fresh schema created, instead
+  of crash-looping the `KeepAlive` daemon. A transient `OperationalError` (locked) is re-raised, not
+  quarantined.
+- **Logs:** both daemons use a `RotatingFileHandler` (5 MB × 3) so the log files are bounded.
 
 ---
 
@@ -323,6 +346,12 @@ Fixtures of real command output live under `tests/fixtures/`.
 ```bash
 python3 -m unittest discover tests -v
 ```
+
+The web dashboard is additionally covered by **Playwright e2e** (Node, under `e2e/`), run in a
+headless browser against `e2e/serve-test.py` (the real working-tree server on a freshly-seeded temp
+DB, port 8799). This is dev-only Node tooling — it does **not** affect the backend's stdlib-only /
+no-`pip` constraint. CI (`.github/workflows/ci.yml`) runs the unittest suite, `swift build`, and the
+e2e suite; `release.yml` builds + DMGs + SHA-256-publishes on a `v*` tag. See `CONTRIBUTING.md`.
 
 ---
 

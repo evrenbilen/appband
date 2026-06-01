@@ -67,7 +67,7 @@ A multi-threaded daemon. Each worker runs on its own cadence and **opens its own
 
 ### Server (`appband/server.py`)
 
-Localhost `ThreadingHTTPServer`. Opens a **fresh read connection per request**. Serves the static dashboard from `appband/web/` and a JSON API: `/api/current`, `/api/sessions`, `/api/timeseries`, `/api/by-network`, `/api/by-process`, `/api/by-domain`.
+Localhost `ThreadingHTTPServer`. Opens a **fresh read connection per request**. Serves the static dashboard from `appband/web/` and a JSON API: `/api/current` (incl. exact `top_apps` + `coverage`), `/api/sessions`, `/api/timeseries` (`granularity` minute/hour/day), `/api/by-network`, `/api/by-process`, `/api/by-domain`, `/api/by-port`, `/api/health`, `/api/gaps`, `/api/version`. The analytics endpoints take an optional `ssid`/`link_type` network filter (JOIN sessions). **Security (P0-A):** every request's `Host`/`Origin` must be loopback (else 403 — DNS-rebinding defense); a strict CSP + self-hosted Chart.js (`/static/vendor/`); `load_config` clamps a non-loopback `bind_host`; the DB is `0600`.
 
 ### The approximation model (important when touching `_by_process` / `_by_domain`)
 
@@ -75,7 +75,7 @@ There is **no per-connection byte accounting** — `nettop` gives bytes-per-proc
 
 ### Schema & migrations (`appband/db.py`)
 
-Tables: `sessions`, `interface_samples`, `process_samples`, `connections`, `dns_cache`. `init_schema` runs `CREATE TABLE IF NOT EXISTS` + enables WAL/foreign-keys. There is **no migration framework** — schema changes are additive only, via the `_ensure_column` helper (see the `connections.scope` example). Bumping columns in `SCHEMA` won't alter existing DBs; add an `_ensure_column` call.
+Tables: `sessions`, `interface_samples`, `process_samples`, `connections`, `dns_cache`, `collector_health` (per-poller heartbeat → `/api/health`), `gaps` (sleep/wake suspension windows → `/api/gaps`). `init_schema` runs `CREATE TABLE IF NOT EXISTS` + enables WAL/foreign-keys. There is **no migration framework** — schema changes are additive only, via the `_ensure_column` helper (see the `connections.scope` example) or a new `CREATE TABLE/INDEX IF NOT EXISTS`. Bumping columns in `SCHEMA` won't alter existing DBs; add an `_ensure_column` call. `connect()` self-heals a corrupt DB (quick_check → quarantine + recreate) and applies WAL-safe perf pragmas (`apply_perf_pragmas`).
 
 ### Parsers (`appband/parsers/`)
 
@@ -90,3 +90,4 @@ SwiftUI menu-bar app (`NSStatusItem` + `NSPopover`, no main window). On first la
 - `unittest` only. Mock the **subprocess boundary** (`appband...._run`, `socket.gethostbyaddr`), never internal logic — parsers and DB code are exercised directly.
 - Tests that touch the collector use a **real temp DB file**, not `:memory:`, because `_conn()` opens connections by path from multiple threads.
 - Tests live next to the behavior they verify (`tests/test_<module>.py`); command-output fixtures live in `tests/fixtures/`.
+- The web dashboard has **Playwright e2e** under `e2e/` (Node, dev-only — does NOT affect the stdlib-only backend): `cd e2e && npm install && npx playwright install chromium && npm test`. Run it for any frontend change. CI (`.github/workflows/ci.yml`) runs unittest + `swift build` + e2e; `release.yml` builds/DMGs/SHA-256 on a `v*` tag.
