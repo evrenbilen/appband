@@ -22,7 +22,10 @@ docs/superpowers/
 # Mac app build artifacts
 mac-app/.build/
 mac-app/AppBand.app/
+mac-app/.swiftpm/
+mac-app/.dmg-stage/
 *.dmg
+*.dSYM/
 
 # e2e (Playwright, Node — dev-only test tooling)
 e2e/node_modules/
