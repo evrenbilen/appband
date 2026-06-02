@@ -20,12 +20,22 @@ Work on the `feat/*` branches, not yet released. Highlights:
 - `minute` time-series granularity (per-minute buckets for short ranges).
 - Per-network (SSID / link-type) filter across `/api/timeseries`, `/api/by-process`,
   `/api/by-domain` — wiring the previously-dead dashboard network selector.
-- `/api/by-port` port/protocol breakdown; `/api/health` (collector heartbeat);
-  `/api/version`.
+- Dashboard panels for the previously backend-only data: a **By Port** card
+  (`/api/by-port`, with well-known-service labels) and a **Session History** card
+  (`/api/sessions`: network / start / duration / IP, with an "Active" pill on the
+  live session).
+- A **custom date-range** picker (two date inputs) alongside the four presets;
+  every endpoint already accepted `from`/`to`.
+- Collection-gap recording (a `gaps` table; sleep/wake or collector-down windows)
+  surfaced as `/api/gaps` and a banner on the time-series panel, so "we weren't
+  watching" is distinguishable from "genuinely zero".
+- New endpoints: `/api/by-port`, `/api/health` (collector heartbeat), `/api/version`.
 - Menu-bar app: Restart Services, Start-at-Login (SMAppService), in-app Uninstall,
-  surfaced install failures, and a connecting/online/offline state.
+  surfaced install failures, a connecting/online/offline state, and a
+  metered-network alert when switching onto an iPhone hotspot / USB tether.
 - A visible "approximate" badge + explainer on the estimated panels.
-- GitHub Actions CI (unittest + `swift build` + Playwright e2e); a Playwright
+- GitHub Actions CI (unittest + `swift build` + Playwright e2e) and a tag-triggered
+  release workflow (build → DMG → SHA-256 manifest → `gh release`); a Playwright
   dashboard e2e suite; single-sourced version (`appband.__version__`).
 
 ### Fixed
@@ -37,6 +47,12 @@ Work on the `feat/*` branches, not yet released. Highlights:
   zone ids and stop mangling bare IPv6 addresses in the lsof parser.
 - Build-time version injection into `Info.plist`; the About sheet reads the real
   version; updating the app re-copies the bundled backend.
+
+### Internal
+- Known-byte-value characterization tests pinning the by-process / by-domain
+  approximation arithmetic; fixture-driven parser tests; locale key-parity test.
+- `dns_cache(resolved_at)` index for the retention purge; per-request SQLite
+  performance pragmas; eliminated test-suite `ResourceWarning`s.
 
 ## [0.1.4] — 2026-06-01
 ### Added
