@@ -26,11 +26,13 @@ final class NetworkMonitor: ObservableObject {
     @Published var session: Session? = nil
     @Published var topApps: [TopApp] = []
     @Published var state: ConnState = .connecting
+    @Published var budget: BudgetStatus? = nil
 
     private var timer: Timer?
     private var failureCount = 0
     private var isRestarting = false
     private var lastLinkType: String?
+    private var budgetTick = 0
     private static let meteredTypes: Set<String> = ["iphone-hotspot", "usb-tether"]
 
     init() {
@@ -81,6 +83,10 @@ final class NetworkMonitor: ObservableObject {
             } else {
                 self.topApps = []
             }
+            // Budget moves slowly — poll /api/budget ~every 60s (every 12th 5s
+            // tick), and once on the first refresh.
+            budgetTick += 1
+            if budgetTick % 12 == 1 { await refreshBudget() }
         } catch {
             self.failureCount += 1
             self.state = self.failureCount >= 2 ? .offline : .connecting
@@ -89,6 +95,7 @@ final class NetworkMonitor: ObservableObject {
             self.mbpsOut = 0
             self.session = nil
             self.topApps = []
+            if self.failureCount >= 2 { self.budget = nil }   // only clear when truly offline, not on a transient blip
         }
     }
 
@@ -113,6 +120,80 @@ final class NetworkMonitor: ObservableObject {
             await refresh()
             isRestarting = false
         }
+    }
+
+    /// Fetch budget status from the backend if a budget is configured. Config
+    /// lives in UserDefaults (app-owned); scope "net" caps the CURRENT network.
+    private func refreshBudget() async {
+        let d = UserDefaults.standard
+        guard d.bool(forKey: BudgetDefaults.enabled) else { self.budget = nil; return }
+        let cap = d.integer(forKey: BudgetDefaults.capBytes)
+        guard cap > 0 else { self.budget = nil; return }
+        let period = d.string(forKey: BudgetDefaults.period) ?? "month"
+        let scope = d.string(forKey: BudgetDefaults.scope) ?? "all"
+
+        var comps = URLComponents(string: "http://127.0.0.1:8765/api/budget")!
+        var items = [
+            URLQueryItem(name: "cap", value: String(cap)),
+            URLQueryItem(name: "period", value: period),
+            URLQueryItem(name: "scope", value: scope),
+        ]
+        if scope == "net" {                      // cap the network we're on now
+            if let ssid = session?.ssid, !ssid.isEmpty {
+                items.append(URLQueryItem(name: "ssid", value: ssid))
+            } else if let lt = session?.linkType {
+                items.append(URLQueryItem(name: "link_type", value: lt))
+            } else {
+                self.budget = nil; return        // no current network to scope to
+            }
+        }
+        comps.queryItems = items
+        guard let url = comps.url else { return }
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            guard let j = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let cb = (j["cap_bytes"] as? NSNumber)?.doubleValue,
+                  let ub = (j["used_bytes"] as? NSNumber)?.doubleValue,
+                  let pct = (j["pct"] as? NSNumber)?.doubleValue else { return }
+            let status = BudgetStatus(usedBytes: ub, capBytes: cb, pct: pct,
+                                      over: (j["over"] as? Bool) ?? (ub >= cb),
+                                      period: (j["period"] as? String) ?? period)
+            self.budget = status
+            checkBudgetThresholds(status, period: period)
+        } catch {
+            // Leave the last value; a transient miss shouldn't blank the bar.
+        }
+    }
+
+    /// Notify as usage crosses 80% then 100%. Dedup state is a single
+    /// UserDefaults key per period ("<bucket>:<highest threshold already fired
+    /// this bucket>"), so storage stays bounded (no unbounded key growth) while
+    /// still firing 80 then 100 as usage climbs within one rolling window.
+    private func checkBudgetThresholds(_ s: BudgetStatus, period: String) {
+        let crossed = s.pct >= 100 ? 100 : (s.pct >= 80 ? 80 : 0)
+        guard crossed > 0 else { return }
+        let window = Double(["hour": 3600, "day": 86400, "week": 604800, "month": 2592000][period] ?? 2592000)
+        let bucket = Int(Date().timeIntervalSince1970 / window)
+
+        let d = UserDefaults.standard
+        let key = "budget.notified.\(period)"
+        // Stored as "<bucket>:<highest threshold already notified this bucket>".
+        var lastBucket = -1, lastThreshold = 0
+        if let parts = d.string(forKey: key)?.split(separator: ":"), parts.count == 2 {
+            lastBucket = Int(parts[0]) ?? -1
+            lastThreshold = Int(parts[1]) ?? 0
+        }
+        let alreadyFired = (bucket == lastBucket) ? lastThreshold : 0
+        guard crossed > alreadyFired else { return }   // nothing new to announce
+
+        d.set("\(bucket):\(crossed)", forKey: key)
+        let content = UNMutableNotificationContent()
+        content.title = crossed >= 100 ? "Data budget exceeded" : "Data budget 80% used"
+        let usedGB = s.usedBytes / 1_073_741_824
+        let capGB = s.capBytes / 1_073_741_824
+        content.body = String(format: "You've used %.1f of %.1f GB this %@.", usedGB, capGB, period)
+        let req = UNNotificationRequest(identifier: "\(key).\(bucket).\(crossed)", content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(req)
     }
 
     /// Notify once when the active network transitions INTO a metered link
