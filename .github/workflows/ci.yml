@@ -42,3 +42,15 @@ jobs:
       - name: Run dashboard e2e tests
         run: npm test
         working-directory: e2e
+
+  lint:
+    name: Shell + plist lint
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck
+        run: command -v shellcheck >/dev/null || brew install shellcheck
+      - name: shellcheck shell scripts
+        run: shellcheck scripts/*.sh mac-app/build.sh mac-app/build-dmg.sh
+      - name: Validate launchd plist templates
+        run: plutil -lint launchd/*.template
