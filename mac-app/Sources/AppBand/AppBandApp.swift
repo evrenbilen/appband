@@ -158,9 +158,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // Run off the main thread so the UI doesn't freeze while uninstall.sh
         // boots out the agents; quit on the main thread once it completes.
         DispatchQueue.global().async {
-            try? proc.run()
-            proc.waitUntilExit()
-            DispatchQueue.main.async { NSApplication.shared.terminate(nil) }
+            var launched = true
+            do {
+                try proc.run()
+                proc.waitUntilExit()
+            } catch {
+                launched = false
+            }
+            let ok = launched && proc.terminationStatus == 0
+            DispatchQueue.main.async {
+                guard ok else {
+                    // Uninstall did NOT complete — the background services (KeepAlive)
+                    // are likely still running. Quitting now would look "uninstalled"
+                    // while collection silently continues, so surface it and stay open.
+                    let alert = NSAlert()
+                    alert.messageText = "Uninstall didn't complete"
+                    alert.informativeText = (launched
+                        ? "The uninstall script exited with status \(proc.terminationStatus). "
+                        : "Couldn't launch the uninstall script. ")
+                        + "The background services may still be running — finish manually:\n\n  "
+                        + script.path
+                    alert.alertStyle = .warning
+                    NSApp.activate(ignoringOtherApps: true)
+                    alert.runModal()
+                    return
+                }
+                NSApplication.shared.terminate(nil)
+            }
         }
     }
 }
