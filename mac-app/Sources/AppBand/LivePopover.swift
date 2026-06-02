@@ -21,6 +21,8 @@ struct LivePopover: View {
                 Divider()
                 topAppsSection
             }
+            Divider()
+            BudgetSection(monitor: monitor)
             if monitor.state == .offline {
                 Divider()
                 menuRow(title: "Restart Services", systemImage: "arrow.clockwise", shortcut: nil) {
