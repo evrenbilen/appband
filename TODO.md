@@ -133,7 +133,7 @@ Veri zaten tam (`scope=all` → `approximate:false`); backend sadece canlı/ince
 ### [~] EPIC P3-C: Release engineering + dağıtım  ·  **otomasyon yapıldı** (yalnız GitHub'da tag'de çalışır)
 - [x] Tag ile tetiklenen release workflow: build + DMG + SHA-256 + `gh release create` — `3cbf58f` (M, high)
 - [x] SHA-256 manifestini yayınla — `3cbf58f` (release workflow üretir; `v*` tag'de) (S, high)
-- [ ] Commit'lenmiş DMG'leri + 26MB scratch image'i sil ve gitignore'la (S, med) (`.gitignore`, `mac-app/`)
+- [x] Commit'lenmiş DMG'leri + scratch image'i sil ve gitignore'la — zaten temiz: `*.dmg`/`.build/`/`AppBand.app/` gitignore'lu, 1MB üzeri izlenen dosya yok (yalnız niyetli README/DMG PNG'leri) (S, med)
 - [ ] Notarization plumbing'i env-credential'ların arkasında ekle (ad-hoc fallback bozulmadan) (M, — ücretli Apple hesabı gerekir) (`mac-app/build-dmg.sh`)
 - [ ] Homebrew cask (ayrı tap repo, yayınlanmış SHA + Release URL'lerine bağlı) (M, high)
 - [ ] GitHub Releases API'sine karşı "güncelleme var" kontrolü (uygulamanın tek dış çağrısı → opt-in + README'de belgele) (M, med) (mac-app)
