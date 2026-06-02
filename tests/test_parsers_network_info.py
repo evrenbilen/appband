@@ -136,6 +136,46 @@ class ClassifyLinkTypeTest(unittest.TestCase):
                 "vpn",
             )
 
+    def test_iphone_hotspot_by_subnet_when_ssid_redacted(self):
+        # macOS 14+ redacts the SSID from the headless collector daemon, so the
+        # name-pattern heuristic can't catch a hotspot. iPhone Personal Hotspot
+        # always hands out 172.20.10.0/28 — classify by subnet regardless of SSID.
+        self.assertEqual(
+            classify_link_type(interface="en0", ssid=None, media="", interface_type="WiFi", ip_address="172.20.10.3"),
+            "iphone-hotspot",
+        )
+
+    def test_iphone_hotspot_subnet_wins_over_usb_media(self):
+        # iPhone tethered over USB also uses 172.20.10.0/28; the iPhone subnet
+        # is more specific than the generic USB-media -> usb-tether default.
+        self.assertEqual(
+            classify_link_type(interface="en6", ssid=None, media="autoselect (USB 10/100/1000)", ip_address="172.20.10.2"),
+            "iphone-hotspot",
+        )
+
+    def test_iphone_hotspot_subnet_boundaries(self):
+        # 172.20.10.0/28 spans .0-.15 (gateway .1, clients .2-.14, broadcast .15).
+        for ip in ("172.20.10.1", "172.20.10.14", "172.20.10.15"):
+            self.assertEqual(
+                classify_link_type(interface="en0", ssid=None, media="", interface_type="WiFi", ip_address=ip),
+                "iphone-hotspot",
+            )
+
+    def test_ips_outside_iphone_subnet_stay_wifi(self):
+        # Home wifi, the adjacent-but-outside 172.20.11.x, and an Android-hotspot
+        # IP must NOT be misread as an iPhone hotspot.
+        for ip in ("192.168.0.116", "172.20.11.1", "10.116.186.1"):
+            self.assertEqual(
+                classify_link_type(interface="en0", ssid=None, media="", interface_type="WiFi", ip_address=ip),
+                "wifi",
+            )
+
+    def test_invalid_ip_falls_through(self):
+        self.assertEqual(
+            classify_link_type(interface="en0", ssid=None, media="", interface_type="WiFi", ip_address="not-an-ip"),
+            "wifi",
+        )
+
 
 class ParseNetworkInfoFixtureTest(unittest.TestCase):
     def _fix(self, name):

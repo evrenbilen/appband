@@ -4,6 +4,7 @@ Provides four focused parsers used by session_watcher.
 """
 from __future__ import annotations
 
+import ipaddress
 import re
 
 _HOTSPOT_PATTERNS = (
@@ -12,6 +13,22 @@ _HOTSPOT_PATTERNS = (
     re.compile(r"\bsamsung\b", re.IGNORECASE),
     re.compile(r"\bgalaxy\b", re.IGNORECASE),
 )
+
+# iPhone Personal Hotspot always hands its clients an address in 172.20.10.0/28
+# (gateway .1, clients .2-.14) — over WiFi, USB, or Bluetooth alike. This is a
+# fixed Apple range and the only reliable hotspot signal on modern macOS, where
+# `ipconfig getsummary` redacts the SSID from the headless collector daemon
+# (no Location Services grant), so the name-pattern heuristic can't fire.
+_IPHONE_HOTSPOT_NET = ipaddress.ip_network("172.20.10.0/28")
+
+
+def _is_iphone_hotspot_ip(ip: str | None) -> bool:
+    if not ip:
+        return False
+    try:
+        return ipaddress.ip_address(ip) in _IPHONE_HOTSPOT_NET
+    except ValueError:
+        return False
 
 
 def parse_default_interface(text: str) -> str | None:
@@ -73,12 +90,18 @@ def classify_link_type(
     ssid: str | None,
     media: str | None,
     interface_type: str | None = None,
+    ip_address: str | None = None,
 ) -> str:
-    """Map (interface, ssid, media, interface_type) -> link_type tag."""
+    """Map (interface, ssid, media, interface_type, ip_address) -> link_type tag."""
     # A VPN/tunnel default route (utun/ipsec/ppp) takes precedence: traffic
     # goes through the tunnel regardless of the underlying physical link.
     if interface.startswith(("utun", "ipsec", "ppp")):
         return "vpn"
+    # iPhone Personal Hotspot's fixed 172.20.10.0/28 range is the reliable
+    # signal on modern macOS, where the SSID is redacted from the daemon (so the
+    # name-pattern check below can't catch it). More specific than wifi/USB.
+    if _is_iphone_hotspot_ip(ip_address):
+        return "iphone-hotspot"
     is_wifi = bool(interface_type and "wifi" in interface_type.lower())
     if is_wifi or ssid:
         if ssid:

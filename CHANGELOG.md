@@ -11,6 +11,15 @@ All notable changes to AppBand are documented here. The format follows
   bar, config form, and 80% / 100% notifications. Scope: all traffic / metered links
   only / current network; period: hour / day / week / month (rolling window).
 
+### Fixed
+- iPhone Personal Hotspot is detected again on macOS 14+ (Sonoma and later),
+  where `ipconfig` redacts the WiFi SSID from the headless collector: classify by
+  the hotspot's fixed `172.20.10.0/28` range instead of the (now unavailable) SSID
+  name. Restores the metered-network alert and the budget's `metered` scope. (On
+  modern macOS the SSID is unavailable to background services, so distinct WiFi
+  networks still group under "(Wi-Fi)"; Android hotspots have no fixed range and
+  remain best-effort.)
+
 ## [0.2.0] — 2026-06-02
 
 A large reliability, dashboard, and hardening release. Highlights:

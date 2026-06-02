@@ -63,6 +63,7 @@ def collect_snapshot() -> NetworkSnapshot | None:
         ssid=summary["ssid"],
         media=ifc.get("media") or "",
         interface_type=summary["interface_type"],
+        ip_address=ifc.get("ip_address"),
     )
     return NetworkSnapshot(
         interface=iface,
