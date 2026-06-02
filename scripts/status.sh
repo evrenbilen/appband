@@ -1,6 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  cat <<'EOF'
+Usage: status.sh [-h|--help]
+
+Show the launchctl state of the AppBand agents, database stats, and the
+tail of the recent collector/server log.
+EOF
+}
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && { usage; exit 0; }
+
 DATA_DIR="$HOME/Library/Application Support/appband"
 LOG_DIR="$HOME/Library/Logs/appband"
 DB="$DATA_DIR/appband.db"

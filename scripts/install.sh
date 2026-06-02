@@ -1,6 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  cat <<'EOF'
+Usage: install.sh [-h|--help]
+
+Render the LaunchAgent plist templates, bootstrap and start the AppBand
+collector and server agents (idempotent — safe to re-run), then open the
+dashboard at http://127.0.0.1:8765/.
+
+  Data: ~/Library/Application Support/appband/
+  Logs: ~/Library/Logs/appband/
+EOF
+}
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && { usage; exit 0; }
+
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LAUNCH_AGENTS="$HOME/Library/LaunchAgents"
 DATA_DIR="$HOME/Library/Application Support/appband"

@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  cat <<'EOF'
+Usage: uninstall.sh [--purge] [-h|--help]
+
+Stop and remove the AppBand LaunchAgents. The collected database is kept
+unless --purge is given.
+
+  --purge   Also delete the collected database.
+EOF
+}
+[[ "${1:-}" == "-h" || "${1:-}" == "--help" ]] && { usage; exit 0; }
+
 LAUNCH_AGENTS="$HOME/Library/LaunchAgents"
 DATA_DIR="$HOME/Library/Application Support/appband"
 PURGE=0
