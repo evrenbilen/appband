@@ -48,6 +48,9 @@ class InitSchemaTest(unittest.TestCase):
         self.assertIn("idx_conn_session", idx)
         # Supports the by-domain/by-process GROUP BY (process_name, bucket).
         self.assertIn("idx_conn_proc_ts", idx)
+        # Covers the daily retention purge `DELETE ... WHERE resolved_at < ?`,
+        # which otherwise full-scans dns_cache.
+        self.assertIn("idx_dns_resolved", idx)
 
     def test_wal_mode_enabled(self):
         init_schema(self.conn)

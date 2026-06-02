@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS dns_cache (
   hostname     TEXT,
   resolved_at  INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_dns_resolved ON dns_cache(resolved_at);
 
 CREATE TABLE IF NOT EXISTS collector_health (
   poller       TEXT PRIMARY KEY,
