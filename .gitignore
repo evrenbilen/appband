@@ -18,6 +18,7 @@ venv/
 # Internal development notes (not for public release)
 docs/internal/
 docs/superpowers/
+CLAUDE.md
 
 # Mac app build artifacts
 mac-app/.build/

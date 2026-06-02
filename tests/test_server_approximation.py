@@ -1,7 +1,7 @@
 """Known-value characterization tests for the by-process / by-domain
 approximation math.
 
-There is no per-connection byte accounting (see CLAUDE.md "approximation
+There is no per-connection byte accounting (see docs/ARCHITECTURE.md "approximation
 model"). `/api/by-process` (scoped) and `/api/by-domain` *distribute* each
 process's measured bytes within a 5-minute bucket. These tests pin the exact
 arithmetic with hand-computed byte values so a future change to the SQL can't
