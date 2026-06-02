@@ -167,6 +167,26 @@ class ApproximationTest(unittest.TestCase):
         self.assertEqual(rows["imap.example"]["bytes_in"], 100)  # 200 / 2 hosts
         self.assertEqual(rows["8.8.8.8"]["bytes_in"], 100)
 
+    def test_by_domain_preserves_bytes_across_buckets_when_not_divisible(self):
+        # Regression: per-bucket integer division truncated each bucket's split.
+        # 3 bytes across 2 hosts in each of two buckets → per-bucket 3/2=1 lost a
+        # byte per bucket (4 of 6 survived). Float-sum-then-truncate-once (matching
+        # the by-process path) keeps all 6.
+        def seed(c):
+            for b in (B0, B0 + 300):
+                insert_process_sample(c, ts=b, session_id=self.sid, process_name="Safari", pid=1, bytes_in=3, bytes_out=0)
+                insert_connection(c, ts=b, session_id=self.sid, process_name="Safari", remote_ip="1.1.1.1", remote_port=443, protocol="tcp", scope="internet")
+                insert_connection(c, ts=b + 1, session_id=self.sid, process_name="Safari", remote_ip="2.2.2.2", remote_port=443, protocol="tcp", scope="internet")
+            upsert_dns(c, "1.1.1.1", "alpha.example", B0)
+            upsert_dns(c, "2.2.2.2", "beta.example", B0)
+        self._seed(seed)
+
+        # Range spans both buckets [B0, B0+600).
+        rows = {r["host"]: r for r in self._get(f"/api/by-domain?from={B0}&to={B0 + 600}&limit=50&scope=internet")["rows"]}
+        self.assertEqual(rows["alpha.example"]["bytes_in"], 3)
+        self.assertEqual(rows["beta.example"]["bytes_in"], 3)
+        self.assertEqual(sum(r["bytes_in"] for r in rows.values()), 6)  # no bytes lost
+
     def test_by_domain_excludes_out_of_scope_hosts_but_keeps_full_bytes(self):
         # Documents the model difference vs by-process: with a LAN host present,
         # scope=internet still distributes the FULL 1000 bytes across the two

@@ -419,8 +419,8 @@ def build_handler(db_path: Path) -> type:
                    GROUP BY process_name, bucket
                 )
                 SELECT cb.host,
-                       SUM(pb.bin  / counts.host_count) AS bytes_in,
-                       SUM(pb.bout / counts.host_count) AS bytes_out
+                       CAST(SUM(pb.bin  * 1.0 / counts.host_count) AS INTEGER) AS bytes_in,
+                       CAST(SUM(pb.bout * 1.0 / counts.host_count) AS INTEGER) AS bytes_out
                   FROM conn_buckets cb
                   JOIN proc_buckets pb USING (process_name, bucket)
                   JOIN counts       USING (process_name, bucket)
