@@ -273,7 +273,7 @@ alter existing databases** — you must add a matching `_ensure_column` call. Ne
 
 ## 10. Parsers — `appband/parsers/`
 
-Pure functions, one module per command (`nettop`, `lsof`, `netstat`, `network_info`). They take
+Pure functions, one module per command (`nettop`, `lsof`, `network_info`). They take
 raw command text and return plain dicts — **no I/O, no DB, no subprocess.** This is what makes the
 system testable: the only mocked boundary is `_run` (the subprocess call) and
 `socket.gethostbyaddr`; everything downstream is exercised with real strings.

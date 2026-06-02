@@ -79,7 +79,7 @@ Tables: `sessions`, `interface_samples`, `process_samples`, `connections`, `dns_
 
 ### Parsers (`appband/parsers/`)
 
-Pure functions, one per command (`nettop`, `lsof`, `netstat`, `network_info`). They take raw command text and return plain dicts — no I/O. `network_info.classify_link_type` maps a snapshot to `wifi` / `iphone-hotspot` / `usb-tether` / `ethernet`. Real-world command output is quirky (see the docstrings in `nettop.py`); when changing a parser, add a fixture under `tests/fixtures/` and assert against it.
+Pure functions, one per command (`nettop`, `lsof`, `network_info`). They take raw command text and return plain dicts — no I/O. `network_info.classify_link_type` maps a snapshot to `wifi` / `iphone-hotspot` / `usb-tether` / `ethernet`. Real-world command output is quirky (see the docstrings in `nettop.py`); when changing a parser, add a fixture under `tests/fixtures/` and assert against it.
 
 ### Mac app (`mac-app/`)
 
