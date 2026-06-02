@@ -1,29 +1,10 @@
 "use strict";
 
 import { t, initI18n, setLocale, currentLocale, applyDom } from "/static/i18n.js";
+import { fmtBytes, fmtMbps, fmtDur, esc, toCsv, parseDateInput } from "/static/util.js";
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 const $ = (id) => document.getElementById(id);
-
-/**
- * Format bytes to human-readable string with 1 decimal beyond MB.
- */
-const fmtBytes = (n) => {
-  if (n == null || isNaN(n)) return "—";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let i = 0;
-  while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
-  const decimals = i >= 2 ? 1 : 0; // 1 decimal for MB and above
-  return `${n.toFixed(decimals)} ${units[i]}`;
-};
-
-/**
- * Format throughput: bytes-per-second → "1.23 Mbps"
- */
-const fmtMbps = (bytesPerSec) => {
-  const mbps = (bytesPerSec * 8) / 1_000_000;
-  return mbps.toFixed(2);
-};
 
 /**
  * Format a unix timestamp into a locale string.
@@ -41,24 +22,6 @@ const fmtUptime = (startedAt) => {
   const m = Math.floor((secs % 3600) / 60);
   return `${h}h ${m}m`;
 };
-
-/**
- * Format a fixed duration (in seconds) between two timestamps → "2h 5m" / "8m" / "12s".
- * Unlike fmtUptime this is anchored to two known points, not "now".
- */
-const fmtDur = (secs) => {
-  if (secs == null || secs < 0) return "—";
-  if (secs < 60) return `${secs}s`;
-  if (secs < 3600) return `${Math.floor(secs / 60)}m`;
-  const h = Math.floor(secs / 3600);
-  const m = Math.floor((secs % 3600) / 60);
-  return m ? `${h}h ${m}m` : `${h}h`;
-};
-
-/**
- * Escape HTML to prevent injection.
- */
-const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
 /**
  * Map a raw link_type slug to a localized label.
@@ -81,18 +44,6 @@ const state = {
 };
 
 /* ─── CSV export (client-side only; no upload — keeps the localhost contract) ── */
-function toCsv(rows) {
-  if (!rows || rows.length === 0) return "";
-  const cols = Object.keys(rows[0]);
-  const cell = (v) => {
-    const s = v == null ? "" : String(v);
-    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const head = cols.join(",");
-  const body = rows.map((r) => cols.map((c) => cell(r[c])).join(",")).join("\n");
-  return `${head}\n${body}\n`;
-}
-
 function downloadCsv(filename, rows) {
   const csv = toCsv(rows);
   if (!csv) return; // nothing loaded yet — no-op rather than an empty file
@@ -123,14 +74,6 @@ function rangeBounds() {
   }
   const lookback = state.range === "custom" ? 86400 : state.range;
   return { from: now - lookback, to: now };
-}
-
-/** Parse a <input type="date"> value ("YYYY-MM-DD") to a local-midnight unix ts. */
-function parseDateInput(val) {
-  if (!val) return null;
-  const [y, m, d] = val.split("-").map(Number);
-  if (!y || !m || !d) return null;
-  return Math.floor(new Date(y, m - 1, d).getTime() / 1000);
 }
 
 /** Query suffix scoping a request to the selected network (or "" for all). */

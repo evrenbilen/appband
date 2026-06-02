@@ -39,6 +39,8 @@ jobs:
       - name: Install Chromium
         run: npx playwright install chromium
         working-directory: e2e
+      - name: Run dashboard util unit tests
+        run: node --test e2e/unit/util.test.mjs
       - name: Run dashboard e2e tests
         run: npm test
         working-directory: e2e
