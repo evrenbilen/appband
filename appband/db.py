@@ -9,6 +9,11 @@ from pathlib import Path
 
 log = logging.getLogger("appband.db")
 
+# Rolling budget windows (seconds), matching the dashboard's range presets.
+PERIOD_SECONDS = {"hour": 3600, "day": 86400, "week": 604800, "month": 2592000}
+# Link types that consume a metered data plan (matches the mac-app's set).
+_METERED_LINK_TYPES = ("iphone-hotspot", "usb-tether")
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
   id          INTEGER PRIMARY KEY,
@@ -360,3 +365,65 @@ def query_timeseries(
         {"ts": row[0], "bytes_in": row[1] or 0, "bytes_out": row[2] or 0}
         for row in cur.fetchall()
     ]
+
+
+def query_budget(
+    conn: sqlite3.Connection,
+    cap_bytes: int,
+    period: str,
+    now: int,
+    scope: str = "all",
+    ssid: str | None = None,
+    link_type: str | None = None,
+) -> dict:
+    """Sum exact interface bytes over a rolling window and compare to a cap.
+
+    Window is rolling: [now - PERIOD_SECONDS[period], now). `scope` selects which
+    sessions count: 'all' (every network), 'metered' (iphone-hotspot/usb-tether),
+    or 'net' (one network — by ssid, else by link_type for the SSID-less networks
+    the dashboard labels like "(Ethernet)"). Bytes come from interface_samples —
+    exact, never the approximate by-domain/by-process distribution. Mirrors the
+    join/filter idiom of query_timeseries."""
+    period = period if period in PERIOD_SECONDS else "month"
+    window = PERIOD_SECONDS[period]
+    from_ts, to_ts = now - window, now
+
+    where = "WHERE i.ts >= ? AND i.ts < ?"
+    params: list = [from_ts, to_ts]
+    if scope == "metered":
+        placeholders = ",".join("?" * len(_METERED_LINK_TYPES))
+        where += f" AND s.link_type IN ({placeholders})"
+        params.extend(_METERED_LINK_TYPES)
+    elif scope == "net":
+        if ssid:
+            where += " AND s.ssid = ?"
+            params.append(ssid)
+        elif link_type:
+            where += " AND s.link_type = ? AND s.ssid IS NULL"
+            params.append(link_type)
+        # else: net-scope with neither ssid nor link_type → no filter (behaves like "all").
+        # The server route validates this case and returns 400 before calling here.
+    # scope == "all": no extra clause.
+
+    cur = conn.execute(
+        f"""
+        SELECT COALESCE(SUM(i.bytes_in + i.bytes_out), 0)
+          FROM interface_samples i
+          JOIN sessions s ON s.id = i.session_id
+         {where}
+        """,
+        params,
+    )
+    used = cur.fetchone()[0]
+    pct = (used / cap_bytes * 100.0) if cap_bytes > 0 else 0.0
+    return {
+        "period": period,
+        "scope": scope,
+        "ssid": ssid,
+        "link_type": link_type,
+        "window": {"from": from_ts, "to": to_ts},
+        "cap_bytes": cap_bytes,
+        "used_bytes": used,
+        "pct": round(pct, 2),
+        "over": cap_bytes > 0 and used >= cap_bytes,
+    }
