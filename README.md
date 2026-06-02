@@ -2,7 +2,7 @@
 
 **Per-App Bandwidth & Network Monitor for macOS**
 
-**[⬇ Download AppBand 0.2.0 (DMG)](https://github.com/evrenbilen/appband/releases/latest)**  ·  macOS 13+  ·  ~500 KB
+**[⬇ Download AppBand 0.2.0 (DMG)](https://github.com/evrenbilen/appband/releases/latest)**  ·  macOS 13+  ·  ~820 KB
 
 [Gatekeeper bypass (first launch only)](#gatekeeper-bypass-first-launch-only)
 
@@ -14,7 +14,7 @@
 
 ### Menu bar
 
-The menu bar item shows the current download / upload throughput inline; clicking opens a popover with the same LIVE panel you see in the dashboard.
+The menu bar item shows the current download / upload throughput inline. Clicking opens a popover with the LIVE panel, the top apps right now, a connecting / online / offline indicator, and quick actions — **Restart Services**, **Start at Login**, **Uninstall**. It also notifies you when you switch onto a metered network (iPhone hotspot / USB tether).
 
 ![AppBand menu bar — compact inline throughput](docs/screenshots/menubar.png)
 
@@ -35,6 +35,19 @@ AppBand is a local, privacy-respecting network usage monitor for macOS. It track
 - Active outbound connections per 30 seconds with reverse-DNS caching
 - Internet vs LAN traffic distinction
 - 30 days of history, auto-purged
+
+## Dashboard & API
+
+A local web dashboard at `http://127.0.0.1:8765/` (EN / TR):
+
+- **LIVE** — exact per-app download / upload over the last 60 seconds, with a coverage chip
+- **Time Series** — bytes over time at minute / hour / day resolution, with collection-gap markers (sleep / downtime ≠ zero traffic)
+- **By App** / **By Domain** — per-process and per-host breakdowns (the domain split is approximate — see [Caveats](#caveats)); each exports to **CSV**
+- **By Network** / **By Port** — usage per Wi-Fi / network and per remote port (with service labels)
+- **Session History** — every network you've been on, with start time, duration, and IP
+- Filters: network (SSID), Internet vs LAN, and a **custom date range** beyond the presets
+
+Health is exposed at `/api/health` (per-poller heartbeats), and the JSON API also serves `/api/current`, `/api/timeseries`, `/api/by-{process,domain,network,port}`, `/api/sessions`, `/api/gaps`, and `/api/version`.
 
 ## Install
 
