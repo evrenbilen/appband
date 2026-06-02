@@ -674,6 +674,25 @@ body {
   width: 100%;
 }
 
+/* Small "⤓ CSV" export button in a card header (pushed to the right edge). */
+.csv-btn {
+  margin-left: auto;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-badge);
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.csv-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
 /* ─── Tables ────────────────────────────────────────────────────────────────── */
 .data-table {
   width: 100%;

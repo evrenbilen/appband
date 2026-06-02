@@ -102,6 +102,21 @@ test.describe("AppBand dashboard", () => {
     await expect(table).toContainText("HTTPS");
   });
 
+  test("exports the By App panel as CSV", async ({ page }) => {
+    await page.goto("/");
+    // Wait for the By App chart to render (data fetched + cached for export).
+    await expect(page.locator("#panel-process #chart-process")).toBeVisible({ timeout: 10_000 });
+    const [download] = await Promise.all([
+      page.waitForEvent("download"),
+      page.click("#export-process"),
+    ]);
+    expect(download.suggestedFilename()).toContain("by-app");
+    const fs = require("fs");
+    const content = fs.readFileSync(await download.path(), "utf8");
+    expect(content).toContain("process_name"); // header row from the row keys
+    expect(content).toContain("Safari"); // seeded app with internet traffic
+  });
+
   test("custom date range drives the from/to query window", async ({ page }) => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");

@@ -21,6 +21,8 @@
   "filters.refresh": "Yenile",
   "filters.language": "Dil",
 
+  "action.export_csv": "CSV olarak dışa aktar",
+
   "panel.current.title": "Şu an",
   "panel.current.live": "Canlı",
   "panel.current.offline": "Aktif ağ yok (çevrimdışı)",

@@ -21,6 +21,8 @@
   "filters.refresh": "Refresh",
   "filters.language": "Language",
 
+  "action.export_csv": "Export as CSV",
+
   "panel.current.title": "Now",
   "panel.current.live": "Live",
   "panel.current.offline": "No active network (offline)",

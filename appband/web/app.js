@@ -77,7 +77,36 @@ const state = {
   linkType: "",   // set instead of ssid for SSID-less networks (e.g. Ethernet)
   scope: "internet",
   charts: {},
+  exports: {},   // last-fetched rows per panel, for CSV export
 };
+
+/* ─── CSV export (client-side only; no upload — keeps the localhost contract) ── */
+function toCsv(rows) {
+  if (!rows || rows.length === 0) return "";
+  const cols = Object.keys(rows[0]);
+  const cell = (v) => {
+    const s = v == null ? "" : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const head = cols.join(",");
+  const body = rows.map((r) => cols.map((c) => cell(r[c])).join(",")).join("\n");
+  return `${head}\n${body}\n`;
+}
+
+function downloadCsv(filename, rows) {
+  const csv = toCsv(rows);
+  if (!csv) return; // nothing loaded yet — no-op rather than an empty file
+  // Blob + object URL: a same-document download, so the strict CSP (which has no
+  // connect-src) is never engaged and nothing leaves localhost.
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 /* ─── Fetch ─────────────────────────────────────────────────────────────── */
 async function fetchJson(path) {
@@ -556,6 +585,7 @@ async function loadByProcess() {
       showEmpty(containerId);
       return;
     }
+    state.exports.process = data.rows;
 
     ensureCanvas(containerId, "chart-process", undefined);
 
@@ -619,6 +649,7 @@ async function loadByDomain() {
       showEmpty(containerId);
       return;
     }
+    state.exports.domain = data.rows;
 
     ensureCanvas(containerId, "chart-domain", 80);
 
@@ -858,6 +889,8 @@ function bind() {
     Promise.allSettled([loadByProcess(), loadByDomain()]);
   });
   $("btn-refresh").addEventListener("click", withRefreshSpinner(refreshAll));
+  $("export-process").addEventListener("click", () => downloadCsv("appband-by-app.csv", state.exports.process));
+  $("export-domain").addEventListener("click", () => downloadCsv("appband-by-domain.csv", state.exports.domain));
 }
 
 /* ─── locale-changed: re-render JS-built content ────────────────────────── */
