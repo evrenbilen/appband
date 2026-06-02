@@ -290,9 +290,16 @@ def record_heartbeat(conn: sqlite3.Connection, poller: str, ts: int) -> None:
 
 
 def get_health(conn: sqlite3.Connection) -> dict:
-    """Return {poller: last_ok_ts} for all recorded pollers."""
-    cur = conn.execute("SELECT poller, last_ok_ts FROM collector_health")
-    return {r[0]: r[1] for r in cur.fetchall()}
+    """Return {poller: last_ok_ts} for all recorded pollers. Degrades to {} if
+    the table doesn't exist yet (a DB an older collector hasn't migrated, or one
+    recovered without it) so a reader never 500s on a missing optional table."""
+    try:
+        cur = conn.execute("SELECT poller, last_ok_ts FROM collector_health")
+        return {r[0]: r[1] for r in cur.fetchall()}
+    except sqlite3.OperationalError as e:
+        if "no such table" in str(e):
+            return {}
+        raise
 
 
 def record_gap(conn: sqlite3.Connection, start_ts: int, end_ts: int) -> None:
@@ -302,12 +309,18 @@ def record_gap(conn: sqlite3.Connection, start_ts: int, end_ts: int) -> None:
 
 
 def get_gaps(conn: sqlite3.Connection, from_ts: int, to_ts: int) -> list[dict]:
-    """Return gaps overlapping the [from_ts, to_ts) window."""
-    cur = conn.execute(
-        "SELECT start_ts, end_ts FROM gaps WHERE end_ts > ? AND start_ts < ? ORDER BY start_ts",
-        (from_ts, to_ts),
-    )
-    return [{"start": r[0], "end": r[1]} for r in cur.fetchall()]
+    """Return gaps overlapping the [from_ts, to_ts) window. Degrades to [] if the
+    table doesn't exist yet (see get_health) rather than raising."""
+    try:
+        cur = conn.execute(
+            "SELECT start_ts, end_ts FROM gaps WHERE end_ts > ? AND start_ts < ? ORDER BY start_ts",
+            (from_ts, to_ts),
+        )
+        return [{"start": r[0], "end": r[1]} for r in cur.fetchall()]
+    except sqlite3.OperationalError as e:
+        if "no such table" in str(e):
+            return []
+        raise
 
 
 def query_timeseries(

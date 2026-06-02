@@ -159,5 +159,35 @@ class DbQueryTest(unittest.TestCase):
         self.assertEqual(result[1]["bytes_out"], 50)
 
 
+class MissingTableToleranceTest(unittest.TestCase):
+    """collector_health and gaps are created by init_schema (run by the
+    collector). The server reads them per request — but if it runs against a DB
+    an older/other collector hasn't migrated yet (upgrade window, or a DB
+    recovered without them), those reads must degrade to empty, not raise (which
+    surfaced as a 500 on /api/health and /api/gaps against a real, un-migrated DB)."""
+
+    def test_get_health_tolerates_missing_collector_health_table(self):
+        bare = sqlite3.connect(":memory:")  # no init_schema → table absent
+        try:
+            self.assertEqual(get_health(bare), {})
+        finally:
+            bare.close()
+
+    def test_get_gaps_tolerates_missing_gaps_table(self):
+        bare = sqlite3.connect(":memory:")
+        try:
+            self.assertEqual(get_gaps(bare, 0, 9_999_999_999), [])
+        finally:
+            bare.close()
+
+    def test_get_health_still_raises_on_a_non_missing_table_error(self):
+        # Only "no such table" is swallowed — a genuinely broken connection must
+        # still surface, so real failures aren't masked as "healthy/empty".
+        bare = sqlite3.connect(":memory:")
+        bare.close()
+        with self.assertRaises(Exception):
+            get_health(bare)
+
+
 if __name__ == "__main__":
     unittest.main()
