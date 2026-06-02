@@ -43,6 +43,7 @@ class ServerTest(unittest.TestCase):
     def tearDown(self):
         self.server.shutdown()
         self.thread.join(timeout=2)
+        self.server.server_close()  # close the listening socket (no ResourceWarning)
         # Remove temp DB and any WAL/SHM sidecar files.
         for suffix in ("", "-wal", "-shm"):
             try:
@@ -114,6 +115,7 @@ class ServerTest(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as ctx:
             self._get("/api/nonexistent")
         self.assertEqual(ctx.exception.code, 404)
+        ctx.exception.close()  # release the error response (no ResourceWarning)
 
     def test_timeseries(self):
         status, body = self._get("/api/timeseries?from=0&to=10000&granularity=hour")
@@ -184,12 +186,14 @@ class ServerTest(unittest.TestCase):
         with self.assertRaises(urllib.error.HTTPError) as ctx:
             self._raw_get("/api/current", {"Host": "evil.com"})
         self.assertEqual(ctx.exception.code, 403)
+        ctx.exception.close()
 
     def test_rejects_cross_origin_request(self):
         # A page on another origin fetching the local API sends its Origin.
         with self.assertRaises(urllib.error.HTTPError) as ctx:
             self._raw_get("/api/current", {"Origin": "http://evil.com"})
         self.assertEqual(ctx.exception.code, 403)
+        ctx.exception.close()
 
     def test_allows_loopback_host_and_origin(self):
         status, _, _ = self._raw_get("/api/current", {"Origin": f"http://127.0.0.1:{self.port}"})
