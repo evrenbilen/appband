@@ -2,9 +2,9 @@
 
 **Per-App Bandwidth & Network Monitor for macOS**
 
-**[⬇ Download AppBand 0.1.4 (DMG)](https://github.com/evrenbilen/appband/releases/latest)**  ·  macOS 13+  ·  ~500 KB
+**[⬇ Download AppBand 0.2.0 (DMG)](https://github.com/evrenbilen/appband/releases/latest)**  ·  macOS 13+  ·  ~500 KB
 
-[Gatekeeper bypass (first launch only)](https://github.com/evrenbilen/appband/edit/main/README.md#gatekeeper-bypass-first-launch-only)
+[Gatekeeper bypass (first launch only)](#gatekeeper-bypass-first-launch-only)
 
 ## Screenshots
 
@@ -40,7 +40,7 @@ AppBand is a local, privacy-respecting network usage monitor for macOS. It track
 
 ### Download the DMG (easiest)
 
-1. Download **AppBand-0.1.4.dmg** from the [latest release](https://github.com/evrenbilen/appband/releases/latest).
+1. Download **AppBand-0.2.0.dmg** from the [latest release](https://github.com/evrenbilen/appband/releases/latest).
 2. Open the DMG and drag **AppBand.app** to **Applications**.
 3. **First launch** — see the [Gatekeeper bypass](#gatekeeper-bypass-first-launch-only) section below to unblock the app on first open.
 4. On launch, AppBand installs the background services into `~/Library/Application Support/AppBand/` and opens the dashboard at http://127.0.0.1:8765/. A small ↓/↑ Mbps indicator appears in your menu bar.
@@ -127,7 +127,7 @@ Two LaunchAgent processes share one SQLite database:
 - **Collector** (`appband.collector`): polls `nettop`, `lsof`, `route`, `ipconfig` on cadences of 2/5/10/30 seconds. Writes interface samples, per-process samples, active connections, sessions.
 - **Server** (`appband.server`): localhost-only HTTP server, JSON API + static dashboard. Reads from the DB.
 
-DB schema: `sessions`, `interface_samples`, `process_samples`, `connections`, `dns_cache`.
+DB schema: `sessions`, `interface_samples`, `process_samples`, `connections`, `dns_cache`, `collector_health`, `gaps`.
 
 ## Caveats
 

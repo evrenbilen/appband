@@ -6,7 +6,11 @@ All notable changes to AppBand are documented here. The format follows
 
 ## [Unreleased]
 
-Work on the `feat/*` branches, not yet released. Highlights:
+_Nothing yet._
+
+## [0.2.0] — 2026-06-02
+
+A large reliability, dashboard, and hardening release. Highlights:
 
 ### Security & privacy
 - Validate the `Host`/`Origin` header (DNS-rebinding / cross-origin defense) and
@@ -84,7 +88,8 @@ First public release.
   hotspot); exclude loopback; per-thread / per-request SQLite connections;
   Wi-Fi detection via `ipconfig getsummary` on recent macOS.
 
-[Unreleased]: https://github.com/evrenbilen/appband/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/evrenbilen/appband/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/evrenbilen/appband/releases/tag/v0.2.0
 [0.1.4]: https://github.com/evrenbilen/appband/releases/tag/v0.1.4
 [0.1.3]: https://github.com/evrenbilen/appband/releases/tag/v0.1.3
 [0.1.2]: https://github.com/evrenbilen/appband/releases/tag/v0.1.2
