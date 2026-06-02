@@ -29,7 +29,15 @@
           <option value="86400" selected data-i18n="filters.range.today">Today</option>
           <option value="604800" data-i18n="filters.range.last_7d">Last 7 days</option>
           <option value="2592000" data-i18n="filters.range.last_30d">Last 30 days</option>
+          <option value="custom" data-i18n="filters.range.custom">Custom…</option>
         </select>
+      </div>
+
+      <div class="filter-group" id="custom-range" hidden>
+        <input type="date" id="from-date" aria-label="From">
+        <span class="custom-range-sep">→</span>
+        <input type="date" id="to-date" aria-label="To">
+        <button type="button" id="apply-range" data-i18n="filters.range.apply">Apply</button>
       </div>
 
       <div class="filter-group">

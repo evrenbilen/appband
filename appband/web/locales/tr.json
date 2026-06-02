@@ -7,6 +7,8 @@
   "filters.range.today": "Bugün",
   "filters.range.last_7d": "Son 7 gün",
   "filters.range.last_30d": "Son 30 gün",
+  "filters.range.custom": "Özel…",
+  "filters.range.apply": "Uygula",
 
   "filters.network.label": "Ağ",
   "filters.network.all": "Tümü",

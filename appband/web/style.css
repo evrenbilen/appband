@@ -182,6 +182,45 @@ body {
   border-color: var(--muted);
 }
 
+/* Custom date-range picker (shown when Range = Custom). */
+#custom-range {
+  gap: 6px;
+}
+#custom-range input[type="date"] {
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-input);
+  padding: 4px 8px;
+  outline: none;
+  box-shadow: var(--shadow-sm);
+}
+#custom-range input[type="date"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.25);
+}
+.custom-range-sep {
+  color: var(--muted);
+  font-size: 13px;
+}
+#apply-range {
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-input);
+  padding: 5px 12px;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+}
+#apply-range:hover {
+  filter: brightness(1.05);
+}
+
 #btn-refresh {
   display: flex;
   align-items: center;

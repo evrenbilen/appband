@@ -88,7 +88,20 @@ async function fetchJson(path) {
 
 function rangeBounds() {
   const now = Math.floor(Date.now() / 1000);
-  return { from: now - state.range, to: now };
+  // Custom mode: use the applied [from, to) window once both bounds are set.
+  if (state.range === "custom" && state.customFrom != null && state.customTo != null) {
+    return { from: state.customFrom, to: state.customTo };
+  }
+  const lookback = state.range === "custom" ? 86400 : state.range;
+  return { from: now - lookback, to: now };
+}
+
+/** Parse a <input type="date"> value ("YYYY-MM-DD") to a local-midnight unix ts. */
+function parseDateInput(val) {
+  if (!val) return null;
+  const [y, m, d] = val.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return Math.floor(new Date(y, m - 1, d).getTime() / 1000);
 }
 
 /** Query suffix scoping a request to the selected network (or "" for all). */
@@ -812,7 +825,24 @@ function highlightActiveLang() {
 /* ─── Event binding ──────────────────────────────────────────────────────── */
 function bind() {
   $("range").addEventListener("change", (e) => {
-    state.range = parseInt(e.target.value, 10);
+    const val = e.target.value;
+    const customEl = $("custom-range");
+    if (val === "custom") {
+      state.range = "custom";
+      if (customEl) customEl.hidden = false;
+      return; // wait for Apply before refetching
+    }
+    if (customEl) customEl.hidden = true;
+    state.range = parseInt(val, 10);
+    refreshAll();
+  });
+  $("apply-range").addEventListener("click", () => {
+    const from = parseDateInput($("from-date").value);
+    const to = parseDateInput($("to-date").value);
+    if (from == null || to == null || to < from) return; // ignore incomplete/invalid
+    state.range = "custom";
+    state.customFrom = from;
+    state.customTo = to + 86_400; // include the whole end day
     refreshAll();
   });
   $("ssid").addEventListener("change", (e) => {

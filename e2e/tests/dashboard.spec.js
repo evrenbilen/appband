@@ -102,6 +102,27 @@ test.describe("AppBand dashboard", () => {
     await expect(table).toContainText("HTTPS");
   });
 
+  test("custom date range drives the from/to query window", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+    // Selecting "Custom" reveals the date inputs.
+    await page.selectOption("#range", "custom");
+    await expect(page.locator("#custom-range")).toBeVisible();
+    // A single-day window (same from/to) must request exactly 86400s of data,
+    // independent of timezone (both bounds are computed as local midnights).
+    await page.fill("#from-date", "2026-05-10");
+    await page.fill("#to-date", "2026-05-10");
+    const req = page.waitForRequest(
+      (r) => r.url().includes("/api/timeseries"),
+      { timeout: 10_000 }
+    );
+    await page.click("#apply-range");
+    const url = new URL((await req).url());
+    const from = Number(url.searchParams.get("from"));
+    const to = Number(url.searchParams.get("to"));
+    expect(to - from).toBe(86_400);
+  });
+
   test("Session History lists past + active sessions", async ({ page }) => {
     // serve-test.py seeds an active Wi-Fi "TestNet" session and an ended
     // Ethernet session; /api/sessions returns both within the Today range.
