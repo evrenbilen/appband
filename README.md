@@ -102,7 +102,7 @@ Double-click `AppBand.app` afterwards — it opens cleanly.
 
 ### When will this go away
 
-When the project graduates to a paid Apple Developer Program account, releases will be notarized and the warning disappears. Until then, see [issue #1](https://github.com/evrenbilen/appband/issues) for status / discussion. If you want to help fund notarization, sponsoring the project is welcome — see the Sponsor button on the repo.
+When the project graduates to a paid Apple Developer Program account, releases will be notarized and the warning disappears. Until then, see [issue #1](https://github.com/evrenbilen/appband/issues/1) for status, discussion, and how to help fund notarization.
 
 ## Status & uninstall
 
