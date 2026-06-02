@@ -196,6 +196,25 @@ def build_handler(db_path: Path) -> type:
                 elif path == "/api/gaps":
                     from appband.db import get_gaps
                     self._json({"gaps": get_gaps(conn, from_ts, to_ts)})
+                elif path == "/api/budget":
+                    from appband.db import query_budget, PERIOD_SECONDS
+                    period = qs.get("period", ["month"])[0]
+                    scope = qs.get("scope", ["all"])[0]
+                    cap_raw = qs.get("cap", [None])[0]
+                    try:
+                        cap = int(cap_raw) if cap_raw is not None else 0
+                    except ValueError:
+                        cap = 0
+                    if cap <= 0:
+                        self._error(400, "'cap' must be a positive integer (bytes)")
+                    elif period not in PERIOD_SECONDS:
+                        self._error(400, "invalid 'period' (want hour|day|week|month)")
+                    elif scope not in ("all", "metered", "net"):
+                        self._error(400, "invalid 'scope' (want all|metered|net)")
+                    elif scope == "net" and not (ssid or link_type):
+                        self._error(400, "scope=net requires 'ssid' or 'link_type'")
+                    else:
+                        self._json(query_budget(conn, cap, period, now, scope, ssid, link_type))
                 else:
                     self._error(404, "not found")
             except (BrokenPipeError, ConnectionResetError):

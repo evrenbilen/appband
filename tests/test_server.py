@@ -399,6 +399,61 @@ class ServerTest(unittest.TestCase):
         names = {r["process_name"] for r in body["rows"]}
         self.assertIn("ProcE", names)
 
+    def test_budget_happy_path_all_scope(self):
+        status, body = self._get("/api/budget?cap=1000000&period=month&scope=all")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["cap_bytes"], 1000000)
+        self.assertEqual(body["scope"], "all")
+        self.assertEqual(body["period"], "month")
+        self.assertIn("used_bytes", body)
+        self.assertIn("pct", body)
+        self.assertIn("over", body)
+        self.assertEqual(body["window"]["to"] - body["window"]["from"], 2592000)
+
+    def test_budget_counts_a_recent_sample(self):
+        # Seed a sample "now" so a rolling window actually includes it.
+        now = int(time.time())
+        conn = sqlite3.connect(self.db_file)
+        sid = open_session(conn, now - 10, "en0", "wifi", "Now", None, "10.0.0.9")
+        insert_interface_sample(conn, ts=now - 5, session_id=sid, bytes_in=400, bytes_out=100)
+        conn.commit()
+        conn.close()
+        status, body = self._get("/api/budget?cap=1000&period=hour&scope=all")
+        self.assertEqual(status, 200)
+        self.assertGreaterEqual(body["used_bytes"], 500)
+        self.assertEqual(body["pct"], round(body["used_bytes"] / 1000 * 100, 2))
+
+    def test_budget_missing_cap_is_400(self):
+        with self.assertRaises(urllib.error.HTTPError) as cm:
+            self._get("/api/budget?period=month")
+        self.assertEqual(cm.exception.code, 400)
+
+    def test_budget_nonpositive_or_nonint_cap_is_400(self):
+        for bad in ("0", "-5", "abc"):
+            with self.assertRaises(urllib.error.HTTPError) as cm:
+                self._get(f"/api/budget?cap={bad}&period=month")
+            self.assertEqual(cm.exception.code, 400)
+
+    def test_budget_bad_period_is_400(self):
+        with self.assertRaises(urllib.error.HTTPError) as cm:
+            self._get("/api/budget?cap=1000&period=year")
+        self.assertEqual(cm.exception.code, 400)
+
+    def test_budget_bad_scope_is_400(self):
+        with self.assertRaises(urllib.error.HTTPError) as cm:
+            self._get("/api/budget?cap=1000&period=month&scope=bogus")
+        self.assertEqual(cm.exception.code, 400)
+
+    def test_budget_net_scope_requires_network(self):
+        with self.assertRaises(urllib.error.HTTPError) as cm:
+            self._get("/api/budget?cap=1000&period=month&scope=net")
+        self.assertEqual(cm.exception.code, 400)
+
+    def test_budget_net_scope_with_ssid_ok(self):
+        status, body = self._get("/api/budget?cap=1000&period=month&scope=net&ssid=Office")
+        self.assertEqual(status, 200)
+        self.assertEqual(body["ssid"], "Office")
+
 
 if __name__ == "__main__":
     unittest.main()
