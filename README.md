@@ -29,7 +29,7 @@ AppBand is a local, privacy-respecting network usage monitor for macOS. It track
 
 ## What it tracks
 
-- Active network: interface, link type (wifi / iphone-hotspot / usb-tether / ethernet), SSID
+- Active network: interface, link type (wifi / iphone-hotspot / usb-tether / ethernet / vpn), SSID
 - Total bytes per 5 seconds (per network route)
 - Bytes per process per 10 seconds (via `nettop`, loopback excluded)
 - Active outbound connections per 30 seconds with reverse-DNS caching
@@ -132,7 +132,7 @@ DB schema: `sessions`, `interface_samples`, `process_samples`, `connections`, `d
 ## Caveats
 
 - Domain-level numbers are **approximate**. `lsof` reports active connections, not bytes-per-connection. Per-process bytes are distributed across the hostnames the process talked to in the same 5-minute window. Treat the domain panel as "where the traffic probably went", not exact accounting.
-- No packet capture (no `tcpdump`). VPN tunnels appear as a single endpoint.
+- No packet capture (no `tcpdump`). VPN/tunnel sessions are labeled `vpn`, but traffic inside the tunnel still appears as a single endpoint (no per-host breakdown).
 - macOS sleep/wake can produce sample gaps; counters are reset on discontinuity to avoid spikes.
 - iPhone Personal Hotspot: AppBand uses `nettop -m route` to bypass a kernel counter bug that can stall per-interface byte counters on tethered connections.
 
