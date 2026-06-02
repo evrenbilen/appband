@@ -14,7 +14,7 @@
 
 ### Menu bar
 
-The menu bar item shows the current download / upload throughput inline. Clicking opens a popover with the LIVE panel, the top apps right now, a connecting / online / offline indicator, and quick actions — **Restart Services**, **Start at Login**, **Uninstall**. It also notifies you when you switch onto a metered network (iPhone hotspot / USB tether).
+The menu bar item shows the current download / upload throughput inline. Clicking opens a popover with the LIVE panel, the top apps right now, a connecting / online / offline indicator, and quick actions — **Restart Services**, **Start at Login**, **Uninstall**. It also notifies you when you switch onto a metered network (iPhone hotspot / USB tether). You can set a **data-usage budget** — a cap per hour / day / week / month, for all traffic, metered links only, or your current network — and get notified at 80% and 100%.
 
 ![AppBand menu bar — compact inline throughput](docs/screenshots/menubar.png)
 
@@ -47,7 +47,7 @@ A local web dashboard at `http://127.0.0.1:8765/` (EN / TR):
 - **Session History** — every network you've been on, with start time, duration, and IP
 - Filters: network (SSID), Internet vs LAN, and a **custom date range** beyond the presets
 
-Health is exposed at `/api/health` (per-poller heartbeats), and the JSON API also serves `/api/current`, `/api/timeseries`, `/api/by-{process,domain,network,port}`, `/api/sessions`, `/api/gaps`, and `/api/version`.
+Health is exposed at `/api/health` (per-poller heartbeats), and the JSON API also serves `/api/current`, `/api/timeseries`, `/api/by-{process,domain,network,port}`, `/api/sessions`, `/api/gaps`, `/api/budget`, and `/api/version`.
 
 ## Install
 
@@ -148,6 +148,7 @@ DB schema: `sessions`, `interface_samples`, `process_samples`, `connections`, `d
 - No packet capture (no `tcpdump`). VPN/tunnel sessions are labeled `vpn`, but traffic inside the tunnel still appears as a single endpoint (no per-host breakdown).
 - macOS sleep/wake can produce sample gaps; counters are reset on discontinuity to avoid spikes.
 - iPhone Personal Hotspot: AppBand uses `nettop -m route` to bypass a kernel counter bug that can stall per-interface byte counters on tethered connections.
+- The **data-usage budget** uses a rolling window (e.g. the last 30 days for "month"), not a calendar month or your carrier's billing cycle — so it won't match a bill to the day.
 
 ## Privacy
 

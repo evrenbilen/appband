@@ -83,7 +83,7 @@ Veri zaten tam (`scope=all` → `approximate:false`); backend sadece canlı/ince
 ### [~] EPIC P2-A: İçgörü + sayaçlı-ağ uyarıları (bildirim katmanı = menü çubuğu app'i)  ·  **metered uyarısı yapıldı**
 - [x] iphone-hotspot/usb-tether geçişinde sayaçlı-ağ uyarısı — `38994be` (+ banner sunumu `5342957`, UNUserNotificationCenterDelegate) (S, high)
 - [ ] Sürekli yüksek-throughput canlı uyarısı ("hotspot'unu bir şey hızla tüketiyor") (M, med) (`NetworkMonitor.swift`)
-- [ ] Veri-kullanım bütçesi: `/api/budget` değerlendirme endpoint'i + macOS UserNotifications (L, high — `interface_samples` tam) (`appband/server.py`, mac-app)
+- [x] Veri-kullanım bütçesi: `/api/budget` değerlendirme endpoint'i + macOS UserNotifications — app-owned config, rolling pencere, scope all/metered/net, %80/%100 uyarı (L, high) (`appband/server.py`, mac-app)
 - [ ] "Ben uyurken internete ne konuştu?" gece/uzakta raporu (M, med) (`appband/server.py`, mac-app)
 - [ ] Günlük/haftalık özet digest'i (`/api/summary` + bildirim + dashboard kartı) (M, med)
 - [ ] Öğrenilmiş (process, host) allowlist'ine karşı beklenmedik-hedef uyarısı (L, med)
