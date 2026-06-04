@@ -5,6 +5,7 @@ from appband.parsers.network_info import (
     parse_airport_ssid,
     parse_ifconfig,
     parse_ipconfig_summary,
+    parse_wifi_device,
     classify_link_type,
 )
 
@@ -175,6 +176,58 @@ class ClassifyLinkTypeTest(unittest.TestCase):
             classify_link_type(interface="en0", ssid=None, media="", interface_type="WiFi", ip_address="not-an-ip"),
             "wifi",
         )
+
+    def test_wifi_interface_name_rescues_transient_interface_type_drop(self):
+        # During a WiFi re-association, `ipconfig getsummary` transiently drops
+        # InterfaceType and the SSID is redacted — leaving no positive WiFi
+        # signal, so the old code fell through to "ethernet" on the WiFi port.
+        # Knowing en0 IS the Wi-Fi device rescues it.
+        self.assertEqual(
+            classify_link_type(interface="en0", ssid=None, media="", interface_type=None,
+                               ip_address="192.168.0.116", wifi_interface="en0"),
+            "wifi",
+        )
+
+    def test_real_ethernet_not_on_wifi_device_stays_ethernet(self):
+        # A genuine wired link on a non-WiFi device keeps classifying as ethernet.
+        self.assertEqual(
+            classify_link_type(interface="en1", ssid=None, media="autoselect (1000baseT <full-duplex>)",
+                               interface_type=None, ip_address="192.168.0.50", wifi_interface="en0"),
+            "ethernet",
+        )
+
+    def test_iphone_subnet_still_wins_over_wifi_interface(self):
+        # Subnet check precedes the WiFi-device check: iPhone-over-WiFi-hotspot on
+        # en0 is iphone-hotspot, not plain wifi.
+        self.assertEqual(
+            classify_link_type(interface="en0", ssid=None, media="", interface_type="WiFi",
+                               ip_address="172.20.10.3", wifi_interface="en0"),
+            "iphone-hotspot",
+        )
+
+
+class ParseWifiDeviceTest(unittest.TestCase):
+    SAMPLE = """Hardware Port: Ethernet
+Device: en1
+Ethernet Address: aa:bb:cc:dd:ee:ff
+
+Hardware Port: Wi-Fi
+Device: en0
+Ethernet Address: 84:2f:57:93:79:fb
+
+Hardware Port: Thunderbolt Bridge
+Device: bridge0
+Ethernet Address: N/A
+"""
+
+    def test_extracts_wifi_device(self):
+        self.assertEqual(parse_wifi_device(self.SAMPLE), "en0")
+
+    def test_returns_none_when_no_wifi_port(self):
+        self.assertIsNone(parse_wifi_device("Hardware Port: Ethernet\nDevice: en1\n"))
+
+    def test_empty(self):
+        self.assertIsNone(parse_wifi_device(""))
 
 
 class ParseNetworkInfoFixtureTest(unittest.TestCase):

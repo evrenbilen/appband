@@ -11,6 +11,7 @@ from appband.parsers.network_info import (
     parse_default_interface,
     parse_ifconfig,
     parse_ipconfig_summary,
+    parse_wifi_device,
 )
 
 log = logging.getLogger("appband.session")
@@ -32,6 +33,22 @@ class NetworkSnapshot:
 # Persists for the daemon's lifetime; a reinstalled tool isn't noticed until
 # restart (acceptable trade-off vs log spam). Mirrors collector._run.
 _missing_tools: set[str] = set()
+
+# The Wi-Fi hardware port's device name (e.g. en0), resolved once and cached for
+# the daemon's lifetime — it virtually never changes at runtime, and this spares
+# a `networksetup` call on every 2s session poll.
+_wifi_iface_cache: str | None = None
+_wifi_iface_resolved = False
+
+
+def _wifi_interface() -> str | None:
+    global _wifi_iface_cache, _wifi_iface_resolved
+    if not _wifi_iface_resolved:
+        _wifi_iface_cache = parse_wifi_device(
+            _run(["/usr/sbin/networksetup", "-listallhardwareports"])
+        )
+        _wifi_iface_resolved = True
+    return _wifi_iface_cache
 
 
 def _run(cmd: list[str]) -> str:
@@ -64,6 +81,7 @@ def collect_snapshot() -> NetworkSnapshot | None:
         media=ifc.get("media") or "",
         interface_type=summary["interface_type"],
         ip_address=ifc.get("ip_address"),
+        wifi_interface=_wifi_interface(),
     )
     return NetworkSnapshot(
         interface=iface,

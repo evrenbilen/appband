@@ -85,14 +85,36 @@ def parse_ipconfig_summary(text: str) -> dict:
     return result
 
 
+def parse_wifi_device(text: str) -> str | None:
+    """Extract the Wi-Fi hardware port's device (e.g. en0) from
+    `networksetup -listallhardwareports`.
+
+    Lets us recognize the WiFi interface by name even when `ipconfig getsummary`
+    transiently drops `InterfaceType` during a re-association (which otherwise
+    leaves no WiFi signal and misclassifies the link as ethernet)."""
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip().lower() == "hardware port: wi-fi":
+            for follow in lines[i + 1:i + 3]:
+                m = re.match(r"\s*Device:\s*(\S+)", follow)
+                if m:
+                    return m.group(1)
+    return None
+
+
 def classify_link_type(
     interface: str,
     ssid: str | None,
     media: str | None,
     interface_type: str | None = None,
     ip_address: str | None = None,
+    wifi_interface: str | None = None,
 ) -> str:
-    """Map (interface, ssid, media, interface_type, ip_address) -> link_type tag."""
+    """Map (interface, ssid, media, interface_type, ip_address) -> link_type tag.
+
+    `wifi_interface` is the device name of the Wi-Fi hardware port (from
+    parse_wifi_device); when the default interface matches it, the link is WiFi
+    even if InterfaceType/SSID are transiently unavailable."""
     # A VPN/tunnel default route (utun/ipsec/ppp) takes precedence: traffic
     # goes through the tunnel regardless of the underlying physical link.
     if interface.startswith(("utun", "ipsec", "ppp")):
@@ -102,7 +124,12 @@ def classify_link_type(
     # name-pattern check below can't catch it). More specific than wifi/USB.
     if _is_iphone_hotspot_ip(ip_address):
         return "iphone-hotspot"
-    is_wifi = bool(interface_type and "wifi" in interface_type.lower())
+    # WiFi if InterfaceType says so, OR this IS the Wi-Fi hardware port — the
+    # latter survives a transient InterfaceType drop during re-association that
+    # otherwise fell through to the ethernet default.
+    is_wifi = bool(interface_type and "wifi" in interface_type.lower()) or (
+        wifi_interface is not None and interface == wifi_interface
+    )
     if is_wifi or ssid:
         if ssid:
             for pat in _HOTSPOT_PATTERNS:

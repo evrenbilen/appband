@@ -19,6 +19,10 @@ All notable changes to AppBand are documented here. The format follows
   modern macOS the SSID is unavailable to background services, so distinct WiFi
   networks still group under "(Wi-Fi)"; Android hotspots have no fixed range and
   remain best-effort.)
+- WiFi is no longer misclassified as "ethernet" during a re-association. The
+  Wi-Fi interface is now recognized by its hardware-port device name
+  (`networksetup -listallhardwareports`), so a transient `InterfaceType` drop
+  from `ipconfig getsummary` can't demote the link to the ethernet default.
 
 ## [0.2.0] — 2026-06-02
 
