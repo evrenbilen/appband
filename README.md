@@ -10,7 +10,20 @@
 
 ### Dashboard
 
-![AppBand dashboard — LIVE panel, time series, by-domain and by-app breakdowns](docs/screenshots/dashboard.png)
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/dashboard-live.png" alt="LIVE — exact per-app download/upload over the last 60s, with a coverage chip"></td>
+    <td width="50%"><img src="docs/screenshots/dashboard-by-network.png" alt="By Network — usage split across Wi-Fi and iPhone hotspot"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/dashboard-timeseries.png" alt="Time Series — daily download/upload with collection-gap markers"></td>
+    <td><img src="docs/screenshots/dashboard-by-app.png" alt="By App — per-process breakdown"></td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/dashboard-by-domain.png" alt="By Domain — approximate per-host breakdown"></td>
+    <td><img src="docs/screenshots/dashboard-by-port.png" alt="By Port — connections per remote port, with service labels"></td>
+  </tr>
+</table>
 
 ### Menu bar
 
@@ -18,7 +31,12 @@ The menu bar item shows the current download / upload throughput inline. Clickin
 
 ![AppBand menu bar — compact inline throughput](docs/screenshots/menubar.png)
 
-![AppBand menu bar popover — LIVE panel with stats, network chip, and actions](docs/screenshots/popover.png)
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/menubar-demo.gif" alt="Live popover — throughput ticking, top apps, network chip, and quick actions"></td>
+    <td width="50%"><img src="docs/screenshots/popover-budget.png" alt="Popover with a data-usage budget bar — 118% of an hourly cap, over"></td>
+  </tr>
+</table>
 
 AppBand is a local, privacy-respecting network usage monitor for macOS. It tracks which app on your machine talked to which destination, over which network, for how many bytes — and shows it on a local web dashboard.
 
