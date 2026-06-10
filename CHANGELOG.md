@@ -6,6 +6,8 @@ All notable changes to AppBand are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-06-10
+
 ### Added
 - Data-usage budget: a stateless `/api/budget` evaluator plus a menu-bar progress
   bar, config form, and 80% / 100% notifications. Scope: all traffic / metered links
